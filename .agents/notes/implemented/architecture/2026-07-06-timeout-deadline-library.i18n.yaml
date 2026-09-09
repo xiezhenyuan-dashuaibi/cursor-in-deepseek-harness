@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-07-06-timeout-deadline-library.md
+2026-07-06-timeout-deadline-library.md: 6bc9515a4803f4c32af3c16eff4860a61f1bb982
+2026-07-06-timeout-deadline-library.zh.md: eb7abad3b6c5ed95889a205086376758cf8da690

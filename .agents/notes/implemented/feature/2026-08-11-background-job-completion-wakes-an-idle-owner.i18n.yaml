@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-11-background-job-completion-wakes-an-idle-owner.md
+2026-08-11-background-job-completion-wakes-an-idle-owner.md: 503eb6fc4dbf5eb342ebc23d3d70d869fff50426
+2026-08-11-background-job-completion-wakes-an-idle-owner.zh.md: f06c0e3b12c8d5a5c61f394e69c578893c3ad25b

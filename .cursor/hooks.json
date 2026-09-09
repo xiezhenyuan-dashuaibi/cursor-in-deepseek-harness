@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "node .cursor/hooks/protect-spine.mjs",
+        "failClosed": true
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "node .cursor/hooks/protect-spine.mjs",
+        "failClosed": true
+      }
+    ]
+  }
+}

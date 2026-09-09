@@ -1,0 +1,33 @@
+import { describe, expect, it } from 'vitest'
+import { encodePtyKey } from '../src/client/pty-keys.ts'
+
+describe('encodePtyKey', () => {
+  it('encodes PTY navigation and control bytes and ignores clipboard/meta/alt chords', () => {
+    expect(encodePtyKey('c', { meta: true })).toBeUndefined()
+    expect(encodePtyKey('c', { alt: true })).toBeUndefined()
+    expect(encodePtyKey('c', { ctrl: true })).toBe('\x03')
+    expect(encodePtyKey('C', { ctrl: true })).toBe('\x03')
+    expect(encodePtyKey('u', { ctrl: true })).toBe('\x15')
+    expect(encodePtyKey('U', { ctrl: true })).toBe('\x15')
+    expect(encodePtyKey('a', { ctrl: true })).toBe('\x01')
+    expect(encodePtyKey('A', { ctrl: true })).toBe('\x01')
+    expect(encodePtyKey('e', { ctrl: true })).toBe('\x05')
+    expect(encodePtyKey('E', { ctrl: true })).toBe('\x05')
+    expect(encodePtyKey('w', { ctrl: true })).toBe('\x17')
+    expect(encodePtyKey('W', { ctrl: true })).toBe('\x17')
+    expect(encodePtyKey('v', { ctrl: true })).toBeUndefined()
+    expect(encodePtyKey('ArrowUp', {})).toBe('\x1b[A')
+    expect(encodePtyKey('ArrowDown', {})).toBe('\x1b[B')
+    expect(encodePtyKey('ArrowRight', {})).toBe('\x1b[C')
+    expect(encodePtyKey('ArrowLeft', {})).toBe('\x1b[D')
+    expect(encodePtyKey('Enter', {})).toBe('\r')
+    expect(encodePtyKey('Escape', {})).toBe('\x1b')
+    expect(encodePtyKey('Backspace', {})).toBe('\x7f')
+    expect(encodePtyKey('Tab', {})).toBe('\t')
+    expect(encodePtyKey('Delete', {})).toBe('\x1b[3~')
+    expect(encodePtyKey('Home', {})).toBe('\x1b[H')
+    expect(encodePtyKey('End', {})).toBe('\x1b[F')
+    expect(encodePtyKey('x', {})).toBe('x')
+    expect(encodePtyKey('F1', {})).toBeUndefined()
+  })
+})

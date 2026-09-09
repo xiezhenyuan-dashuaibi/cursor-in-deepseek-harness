@@ -1,0 +1,38 @@
+# @deepseek-ai/dsh-client-ui-float-window
+
+English | [中文](README.zh.md)
+
+Reusable overlay **card desk** (the card-window presentation form): draggable, edge-resizable windows on `shell.overlay`. The browser half registers `OverlayDesk` with id `overlay-card` (never `root`, never `cursor-agent`). Chrome left is the title then the unique id (`--title` / `--card-id`; the slot seat is not that id) at the top of a title bar that overlays the body and fades to transparent at its lower edge; trailing controls occupy that card's list; built-in **缩小** collapses that window into an edge tag at the last parked edge (nearest board edge on first 缩小). The tag shows the title only. Left and right docks are a horizontal ribbon; top and bottom are vertical. The swallowtail V sits on the free end that sticks into the board. At rest the attached half sits past the edge; hover peeks toward the board. Drag the tag: near an edge it magnet-snaps onto that edge at that along position. Click the tag to restore the last expanded frame; drop it farther than the magnet range from every edge to expand at the release origin. Shrink flies as the expanded card to the painted ribbon, then the tag-face crossfade; expand crossfades back from the tag into the frame. Minimize keeps the body mounted and is not roster `hidden`. Title-bar hover on an expanded card keeps the default cursor (not grab); a docked tag uses grab. n/s/e/w resize hits the outer 4px strip so the body scrollbar stays clickable; corners stay 12px. Primary-button pointer down anywhere in the window raises that card inside the desk and raises the desk in `ctx.overlayStack` so the Cursor conversation window can sit in front. The board uses `isolation: isolate` so card `z-index` does not compete with Cursor. Each body is a page plugin: product title, primary actions, and viewport live there. Frames live in a register-declared desk store and persist in `localStorage` (`dsh.overlay-card.frames`) across a page reload. Insert `--title` / `--card-id` / `--width` / `--height` write the spec into `instances.json` (defaults `卡片`, next seat as a decimal id, 360×280). A spec with `hidden: true` stays in that file and is listed by the Cursor rail plugin manager; the desk mounts a window only when the spec is not hidden and occupant fibers are inserted. The node half serves `instances.list`, `instances.setHidden`, and `occupants.setInserted` from `instances.json` and the live profile patch. A newly mounted card sits to the right of the current rightmost frame; when that opening size would leave the playable board, it overlaps the default origin. Drag and `preferFrame` keep a title-bar grab strip on the board (36px tall, 120px wide); the body may hang past the left, right, or bottom, and the overlay layer clips it. After that, `preferFrame`, drag, and resize change only that card's frame. Same-document `#id` links resolve inside that body; CSS `#id` and `getElementById` are document-global, so the body walks descendants by the `id` property and adjusts only a scrollport inside that body. They do not target another window. A body slot with no occupant shows the filled `空卡片` label. Omit `x` / `y` on `preferFrame` to keep the current origin. Seat 1 occupies `overlay-card.body`; seat N occupies `overlay-card-N.body`. A page plugin occupies a body slot through `ctx.slots.inject`; this package does not import that page. A tall branded title bar is an edit of `OverlayCard` in this package.
+
+The `/client` exports are the plugin body (`apply` / `inject`), the `overlay-card` locale key union, `overlayCardBodySlot`, and the `preferFrame` / trailing owner types. The card component stays package-internal. npm path `ui-float-window` is the author tree; occupant identity is `overlay-card`.
+
+## Use
+
+Insert this package, then occupy `overlay-card.body`. Do not copy this tree into a product package. Write the page package with `pnpm overlay:new-page <name>`; do not clone another occupant or this card. `--id` is the Loader directory id, not the card unique id.
+
+```sh
+pnpm overlay:live insert packages/client/ui-float-window --title 卡片 --card-id 1 --width 360 --height 280
+pnpm overlay:live insert packages/client/ui-float-window --title 草稿 --card-id draft --width 520 --height 400
+pnpm overlay:live remove overlay-card-draft
+```
+
+The first insert mounts `卡片 1` at 360×280 when flags are omitted. That insert also writes `./overlay-card-roster-rpc.mjs` when the profile has no overlay-card RPC row, so `/overlay-card` mounts even when this process already cached the npm package `apply`, and `./overlay-card-plug-rpc.mjs` so hide and insert writes can mount on `/overlay-card-plug` beside a list-only first handler. A later insert of this package appends another spec (at most 8) without a second Loader row and without copying `lib/` again. `remove overlay-card-<id>` drops that window. `remove ui-float-window` (or that Loader id) unloads the desk. A page plugin type-imports `@deepseek-ai/dsh-client-ui-float-window/client` for `SlotMap` and registers into `overlay-card.body` (or `overlay-card-N.body`). Page packages declare `dsh.client.overlayBody` so `overlay:live insert` records occupancy. Operational HOW: [dsh-overlay-web-plugins](../../../.agents/skills/dsh-overlay-web-plugins/SKILL.md).
+
+## Model Experience
+
+None, as the reusable overlay card is a browser occupant plus a roster RPC and registers nothing model-facing.
+
+#### KV Cache effect
+
+None; this package neither assembles nor sends a provider request.
+
+## Known Limitations and Deferred Work
+
+- **Frames are browser-local** — `x` / `y` / `width` / `height`, desk stacking, per-card edge tags, and last parks persist in `localStorage` (`dsh.overlay-card.frames`) for this origin. Clearing site data restores insert placement with no tags, then a page may call `preferFrame`. `instances.json` still owns the plugin roster, not live geometry.
+- **Must not occupy `root` or reuse `cursor-agent`** — `root` shadows AppFrame; `cursor-agent` is the Cursor overlay panel.
+- **Each body slot is `kind: 'single'`** — one page occupant per card. Unload or replace the page plugin to show a different product on that card.
+- **Trailing chrome is per card** — a list slot for extra controls beside built-in 缩小. Pointer events there do not start a drag; they still raise the window. Absent occupants leave the region blank. 缩小 is OverlayCard chrome, not this slot.
+- **Insert flags are not Loader `config`** — `overlay:live` still writes Loader `{ id, name }` only; title, unique id, and opening size live in `instances.json`. A page `preferFrame` may still change size on first mount; a stored frame or user drag/resize ignores a later call.
+- **Live `/overlay-card` uses a profile-relative module** — Node caches the first `apply` of this package name. `overlay:live insert` or `update` writes `./overlay-card-roster-rpc.mjs` when the profile has no overlay-card RPC row, and `./overlay-card-plug-rpc.mjs` so `instances.setHidden` and `occupants.setInserted` can mount on `/overlay-card-plug` when that first `/overlay-card` handler is still list-only. Card `update` retargets that Loader name to `./overlay-card-hide-rpc.mjs` when the first plug-rpc URL is already cached. Source launch of this package reads the live `plugins/*/instances.json` copy, not the checkout one-card template.
+- **At most eight cards** — body slots are predeclared through `overlay-card-8.body`.
+- **Hide keeps the spec; unplug keeps the live copy** — `hidden: true` skips the window. Occupant `disabled: true` pauses that Loader fiber. Neither deletes `instances.json` rows nor checkout packages. The plugin panel does not call `overlay:live remove`.

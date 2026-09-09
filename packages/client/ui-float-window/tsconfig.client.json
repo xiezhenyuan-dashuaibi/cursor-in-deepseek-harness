@@ -1,0 +1,47 @@
+{
+  "extends": "../../../tsconfig.base.client.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.client.tsbuildinfo"
+  },
+  "files": [
+    "src/css-modules.d.ts",
+    "src/instances.ts",
+    "src/client/contract/slots.ts",
+    "src/client/geometry.ts",
+    "src/client/hash.ts",
+    "src/client/index.ts",
+    "src/client/locales.ts",
+    "src/client/OverlayCard.tsx",
+    "src/client/OverlayDesk.tsx",
+    "src/client/roster.ts",
+    "src/client/stores.ts"
+  ],
+  "references": [
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../connection/tsconfig.client.json"
+    },
+    {
+      "path": "../locale"
+    },
+    {
+      "path": "../runtime"
+    },
+    {
+      "path": "../ui-layout"
+    },
+    {
+      "path": "../ui-slots"
+    },
+    {
+      "path": "../../host/apiproxy"
+    },
+    {
+      "path": "../../runtime-diagnostics/invariants"
+    }
+  ]
+}

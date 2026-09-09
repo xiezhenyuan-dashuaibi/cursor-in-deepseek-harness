@@ -1,0 +1,32 @@
+{
+  "cards": [
+    {
+      "seat": 1,
+      "id": "barber",
+      "title": "青石",
+      "width": 1080,
+      "height": 820
+    },
+    {
+      "seat": 2,
+      "id": "petshop",
+      "title": "毛小馆",
+      "width": 1080,
+      "height": 820
+    },
+    {
+      "seat": 3,
+      "id": "hub",
+      "title": "后端",
+      "width": 720,
+      "height": 640
+    },
+    {
+      "seat": 4,
+      "id": "store",
+      "title": "数据库",
+      "width": 900,
+      "height": 620
+    }
+  ]
+}

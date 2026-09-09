@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "dsh": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "packages/cursor/mcp-server/bin/stdio.mjs"
+      ]
+    }
+  }
+}

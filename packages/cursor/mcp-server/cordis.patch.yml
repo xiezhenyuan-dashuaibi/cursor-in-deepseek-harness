@@ -1,0 +1,17 @@
+# Cursor MCP stdio server over dsh-base. No Host, HTTP, or browser layer.
+# Stdout is reserved for MCP JSON-RPC; this overlay mounts no logger.
+
+- id: hmr
+  disabled: true
+
+- id: system-prompt
+  config:
+    persona: >-
+      You are a coding agent powered by the {{model}} model. Your working directory is {{cwd}}.
+
+- insert:
+    - id: cursor-mcp-prompt
+      name: '@deepseek-ai/dsh-cursor-mcp-prompt'
+
+    - id: cursor-mcp-server
+      name: '@deepseek-ai/dsh-cursor-mcp-server'

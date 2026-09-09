@@ -1,0 +1,12 @@
+/* Full-size clip board: card `left`/`top` are board-local. Isolation keeps
+   card `z-index` inside this board so it does not compete with the Cursor
+   window. The shell layer leaves `[data-overlay-board]` click-through so empty
+   space does not steal hits from sibling overlay occupants. Cards opt back in
+   on `.window`. */
+.board {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  isolation: isolate;
+}

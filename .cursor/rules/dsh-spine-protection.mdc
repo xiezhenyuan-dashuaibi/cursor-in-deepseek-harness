@@ -1,0 +1,30 @@
+---
+description: Deny Cursor Agent writes to the DSH spine; put new behavior in a plugin beside it.
+alwaysApply: true
+---
+
+# DSH spine write deny (Cursor)
+
+The DSH file sandbox does **not** apply to Cursor's own file, search, or shell tools. It only fences DSH tools such as `dsh_write`, which this MCP catalog omits.
+
+Cursor Agent writes are denied under:
+
+- `vendor/`
+- `packages/core/`
+- `packages/boot/`
+- `native/`
+- `.cursor/hooks.json` and `.cursor/hooks/`
+
+Enforcement for the **desktop IDE** is the project hook in `.cursor/hooks.json` (`preToolUse` + `beforeShellExecution`). Enforcement for the **embedded overlay CLI** (`dsh web`) is `packages/cursor/agent-gateway/fence/preload.mjs`, injected by the gateway as Node `--import` on every headless `--force` spawn when cwd is this checkout. Reads, tests, and ripgrep against those trees stay allowed. Overlay `pnpm install` may write a resolved `node_modules` path under those prefixes (workspace install artifacts), including replacing a workspace symlink there. Spine **source** stays denied, including a write through a `node_modules` directory link.
+
+Cursor-version work belongs in `packages/cursor/`, `packages/client/` (overlay UI), and bundle/profile patches. Do not patch `agent-loop` to add Cursor behavior.
+
+If a write or mutating shell is denied, stop. Do not work around the deny with:
+
+- `git apply`, `patch`, python, or a shell that mutates those trees without naming the path in argv
+- editing `packages/cursor/agent-gateway/fence/preload.mjs` or `.cursor/hooks` to weaken the fence
+- `dsh_workflow` or `dsh_ralph` tasked to write those trees — Cursor MCP omits those parent tools; if they reappear, their children keep DSH file and shell tools under `workspace-write`
+
+Policy: `.agents/notes/implemented/process/2026-09-01-cursor-spine-write-deny.md`
+
+Role: `.cursor/rules/dsh-cursor-in-dsh.mdc`

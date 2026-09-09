@@ -1,0 +1,1381 @@
+/* Hide DSH chrome while this overlay is loaded. Conversation `.root` is a
+   hashed class at the same specificity as the surface attribute, so hide
+   rules use !important. Slots stay declared so sibling inject() waiters
+   still settle; this is presentation, not a slot replacement. */
+:global([data-dsh-shell-frame]) {
+  grid-template-columns: 0 minmax(0, 1fr) 0 !important;
+}
+
+:global([data-dsh-shell-sidebar]),
+:global([data-dsh-shell-details]),
+:global([data-dsh-shell-frame] > [data-side]) {
+  display: none !important;
+}
+
+:global([data-dsh-conversation-surface]),
+:global([data-slot='conversation']),
+:global([data-slot='sidebar']),
+:global([data-slot='details']) {
+  display: none !important;
+}
+
+:global([data-shell-overlay]) {
+  background: var(--dsw-alias-bg-base);
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.window {
+  /* Nested `font: var(--dsw-font-*)` shorthands use px; remap them here so
+     rail, composer, and MarkdownText all follow one overlay scale. */
+  --cursor-overlay-type: 0.9;
+  /* Thinner than the themed 8px scrollbar so the inner half of each edge stays clickable. */
+  --cursor-resize-hit: 4px;
+  --cursor-minimize-duration: 320ms;
+  --cursor-minimize-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dsw-font-xs-13: calc(13px * var(--cursor-overlay-type)) / calc(20px * var(--cursor-overlay-type)) var(--dsw-font-family);
+  --dsw-font-xs-strong-13: 500 calc(13px * var(--cursor-overlay-type)) / calc(20px * var(--cursor-overlay-type)) var(--dsw-font-family);
+  --dsw-font-xxs-12: calc(12px * var(--cursor-overlay-type)) / calc(18px * var(--cursor-overlay-type)) var(--dsw-font-family);
+  /* Markdown body matches user/composer xs-13; headings step up from that face. */
+  --dsw-font-markdown-h1: 700 calc(18px * var(--cursor-overlay-type)) / calc(26px * var(--cursor-overlay-type)) var(--dsw-font-family);
+  --dsw-font-markdown-h2: 700 calc(16px * var(--cursor-overlay-type)) / calc(24px * var(--cursor-overlay-type)) var(--dsw-font-family);
+  --dsw-font-markdown-h3: 700 calc(15px * var(--cursor-overlay-type)) / calc(22px * var(--cursor-overlay-type)) var(--dsw-font-family);
+  --dsw-font-markdown-h4: 600 calc(14px * var(--cursor-overlay-type)) / calc(21px * var(--cursor-overlay-type)) var(--dsw-font-family);
+  --dsw-font-markdown-base: calc(13px * var(--cursor-overlay-type)) / calc(20px * var(--cursor-overlay-type)) var(--dsw-font-family);
+  --dsw-font-markdown-base-strong: 600 calc(13px * var(--cursor-overlay-type)) / calc(20px * var(--cursor-overlay-type)) var(--dsw-font-family);
+  --dsw-font-markdown-base-italic: italic calc(13px * var(--cursor-overlay-type)) / calc(20px * var(--cursor-overlay-type)) var(--dsw-font-family);
+  --dsw-font-markdown-base-strong-italic: italic 600 calc(13px * var(--cursor-overlay-type)) / calc(20px * var(--cursor-overlay-type)) var(--dsw-font-family);
+  --dsw-font-markdown-table: calc(12px * var(--cursor-overlay-type)) / calc(18px * var(--cursor-overlay-type)) var(--dsw-font-family);
+  --dsw-font-markdown-table-head: 500 calc(12px * var(--cursor-overlay-type)) / calc(18px * var(--cursor-overlay-type)) var(--dsw-font-family);
+  --dsw-font-markdown-small: calc(12px * var(--cursor-overlay-type)) / calc(18px * var(--cursor-overlay-type)) var(--dsw-font-family);
+  --dsw-font-markdown-small-strong: 600 calc(12px * var(--cursor-overlay-type)) / calc(18px * var(--cursor-overlay-type)) var(--dsw-font-family);
+  --dsw-font-markdown-small-italic: italic calc(12px * var(--cursor-overlay-type)) / calc(18px * var(--cursor-overlay-type)) var(--dsw-font-family);
+  --dsw-font-markdown-small-strong-italic: italic 600 calc(12px * var(--cursor-overlay-type)) / calc(18px * var(--cursor-overlay-type)) var(--dsw-font-family);
+  --dsw-font-markdown-code: calc(12px * var(--cursor-overlay-type)) / calc(18px * var(--cursor-overlay-type)) var(--ds-font-family-code);
+  --dsw-font-markdown-code-block: calc(12px * var(--cursor-overlay-type)) / calc(18px * var(--cursor-overlay-type)) var(--ds-font-family-code);
+  --dsw-font-markdown-code-block-small: calc(11px * var(--cursor-overlay-type)) / calc(16px * var(--cursor-overlay-type)) var(--ds-font-family-code);
+  position: fixed;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
+  border-radius: 16px;
+  background: var(--dsw-alias-bg-base);
+  box-shadow: var(--dsw-shadow-lv3);
+  color: var(--dsw-alias-label-primary);
+  font-size: calc(16px * var(--cursor-overlay-type));
+  pointer-events: auto;
+}
+
+.window[data-geometry-animating] {
+  transition:
+    left var(--cursor-minimize-duration) var(--cursor-minimize-ease),
+    top var(--cursor-minimize-duration) var(--cursor-minimize-ease),
+    width var(--cursor-minimize-duration) var(--cursor-minimize-ease),
+    height var(--cursor-minimize-duration) var(--cursor-minimize-ease),
+    border-radius var(--cursor-minimize-duration) var(--cursor-minimize-ease),
+    box-shadow var(--cursor-minimize-duration) var(--cursor-minimize-ease);
+}
+
+.window[data-minimized] {
+  overflow: visible;
+  /* No panel chrome behind the sprite — border/background/shadow would read
+     as a larger circular plate under the glass bubble. */
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  background-color: transparent;
+  box-shadow: none;
+}
+
+/* Geometry tween must not keep the expanded panel shadow on the 52px disc. */
+.window[data-minimized][data-geometry-animating] {
+  background: transparent;
+  background-color: transparent;
+  box-shadow: none;
+  transition:
+    left var(--cursor-minimize-duration) var(--cursor-minimize-ease),
+    top var(--cursor-minimize-duration) var(--cursor-minimize-ease),
+    width var(--cursor-minimize-duration) var(--cursor-minimize-ease),
+    height var(--cursor-minimize-duration) var(--cursor-minimize-ease),
+    border-radius var(--cursor-minimize-duration) var(--cursor-minimize-ease);
+}
+
+.window[data-minimized] .body {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.srStatus {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  background: var(--dsw-alias-bg-base);
+}
+
+/* Right column only: empty ~1cm drag band above transcript/composer. */
+.chatColumn {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.dragStrip {
+  flex: none;
+  position: relative;
+  z-index: 2;
+  height: 1cm;
+  /* Soften the seam into the transcript: solid at the top, clear at the bottom. */
+  margin-bottom: -20px;
+  background: linear-gradient(
+    to bottom,
+    var(--dsw-alias-bg-base) 0%,
+    var(--dsw-alias-bg-base) 45%,
+    transparent 100%
+  );
+  cursor: default;
+  user-select: none;
+  touch-action: none;
+}
+
+.minimizeButton {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-overlay) 72%, transparent);
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  opacity: 0.72;
+  transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.minimizeButton:hover,
+.minimizeButton:focus-visible {
+  opacity: 1;
+  color: var(--dsw-alias-label-primary);
+  background: color-mix(in srgb, var(--dsw-alias-bg-overlay) 92%, var(--dsw-alias-bg-base));
+}
+
+/* Presence bubble: clear glass + specular rim; swim / heading stay in JS. */
+.spriteFace {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  background-color: transparent;
+  box-shadow: none;
+  color: var(--dsw-alias-label-primary);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.spriteFace:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--dsw-alias-label-secondary) 70%, transparent);
+  outline-offset: 4px;
+}
+
+.spriteFace:active {
+  cursor: grabbing;
+}
+
+/* Cursor-adjacent expand cue after ~1s hover stillness — no chip/background. */
+.spriteHint {
+  position: absolute;
+  z-index: 5;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  white-space: nowrap;
+  pointer-events: none;
+  /* Lighter status hues at 50% opacity — less shouty than primary green/red. */
+  color: color-mix(in srgb, var(--dsw-alias-state-error-secondary) 50%, transparent);
+  font: var(--dsw-font-xxs-12);
+}
+
+.spriteHint[data-sprite-status='live'] {
+  color: color-mix(in srgb, var(--dsw-alias-state-success-secondary) 50%, transparent);
+}
+
+.spriteBob {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: transparent;
+  box-shadow: none;
+  animation: spriteArrive 480ms var(--cursor-minimize-ease) both;
+}
+
+.spriteFace:active .spriteBob {
+  animation-play-state: paused;
+}
+
+.spriteLens {
+  --sprite-jelly-ease: cubic-bezier(0.34, 1.45, 0.64, 1);
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-bg-overlay) 45%, transparent);
+  background:
+    radial-gradient(
+      130% 100% at 30% 18%,
+      color-mix(in srgb, var(--dsw-alias-bg-overlay) 28%, transparent) 0%,
+      color-mix(in srgb, var(--dsw-alias-bg-overlay) 8%, transparent) 48%,
+      transparent 100%
+    );
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  backdrop-filter: blur(10px) saturate(1.2);
+  /* Inset-only lighting — outer soft shadows bloom into a larger white plate. */
+  box-shadow:
+    inset 2px 3px 7px color-mix(in srgb, var(--dsw-alias-bg-overlay) 48%, transparent),
+    inset -2px -3px 8px color-mix(in srgb, var(--dsw-alias-label-primary) 7%, transparent),
+    0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent);
+  transition:
+    transform 220ms var(--sprite-jelly-ease),
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+/* Primary specular highlight (wet glass hot-spot). */
+.spriteLens::before {
+  content: '';
+  position: absolute;
+  top: 7%;
+  left: 14%;
+  z-index: 3;
+  width: 48%;
+  height: 34%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse 80% 70% at 40% 35%,
+    color-mix(in srgb, var(--dsw-alias-bg-overlay) 96%, transparent) 0%,
+    color-mix(in srgb, var(--dsw-alias-bg-overlay) 50%, transparent) 34%,
+    color-mix(in srgb, var(--dsw-alias-bg-overlay) 10%, transparent) 62%,
+    transparent 78%
+  );
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+/* Soft lower glint only — no full-disk rim that paints a second circle. */
+.spriteLens::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 72% 78%,
+    color-mix(in srgb, var(--dsw-alias-bg-overlay) 22%, transparent) 0%,
+    transparent 28%
+  );
+  mix-blend-mode: soft-light;
+}
+
+.spriteFace:hover .spriteLens,
+.spriteFace:focus-visible .spriteLens {
+  transform: scale(1.08);
+  border-color: color-mix(in srgb, var(--dsw-alias-bg-overlay) 62%, transparent);
+  box-shadow:
+    inset 2px 3px 9px color-mix(in srgb, var(--dsw-alias-bg-overlay) 58%, transparent),
+    inset -2px -3px 8px color-mix(in srgb, var(--dsw-alias-label-primary) 6%, transparent),
+    0 1px 3px color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent);
+}
+
+.spriteFace:active .spriteLens {
+  transform: scale(0.9);
+  box-shadow:
+    inset 0 3px 8px color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent),
+    inset 0 -2px 5px color-mix(in srgb, var(--dsw-alias-bg-overlay) 28%, transparent),
+    0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary) 8%, transparent);
+}
+
+.spriteFace[data-sprite-status='disconnected'] .spriteLens {
+  opacity: 0.62;
+}
+
+.spriteMark {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 30px;
+  height: 30px;
+  overflow: visible;
+}
+
+.spriteRing {
+  stroke: var(--dsw-alias-label-primary);
+  stroke-width: 1.4;
+}
+
+.spriteInner {
+  fill: var(--dsw-alias-label-primary);
+  font: 700 15px / 1 var(--dsw-font-family);
+}
+
+@keyframes spriteArrive {
+  from {
+    opacity: 0;
+    transform: scale(0.68) translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* One full-height slab. Inner layout is always the expanded width; the
+   aside clips it while collapsed so icons stay in a 40px column. The Cursor
+   mark and plugin control stay outside the session scroller. */
+.rail {
+  --rail-collapsed: 40px;
+  --rail-expanded: 228px;
+  flex: none;
+  width: var(--rail-collapsed);
+  align-self: stretch;
+  overflow: hidden;
+  box-sizing: border-box;
+  background: var(--dsw-specific-sidebar-fill);
+  border-right: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
+  transition: width 180ms ease;
+}
+
+.railOpen {
+  width: var(--rail-expanded);
+}
+
+.railInner {
+  display: flex;
+  width: var(--rail-expanded);
+  height: 100%;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 8px 6px 10px;
+  overflow: hidden;
+}
+
+.railSessions {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.mark {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-overlay) 22%, var(--dsw-alias-bg-base));
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-strong-13);
+  line-height: 26px;
+  text-align: center;
+  cursor: default;
+  user-select: none;
+  touch-action: none;
+}
+
+.sessionList {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sessionItem {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  gap: 2px;
+  border-radius: 8px;
+}
+
+.sessionItemActive {
+  background: color-mix(in srgb, var(--dsw-alias-bg-base) 42%, transparent);
+}
+
+.sessionHit,
+.newSession {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-13);
+  text-align: left;
+  cursor: pointer;
+}
+
+.newSession {
+  flex: none;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.pluginToggle {
+  display: flex;
+  flex: none;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  margin-top: 2px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-13);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pluginDock {
+  position: relative;
+  z-index: 3;
+  flex: none;
+  width: 100%;
+}
+
+.pluginPanel {
+  /* One list row is name + id; 3.5 rows plus the three gaps between them. */
+  --plugin-row-height: 36px;
+  --plugin-row-gap: 6px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  z-index: 3;
+  box-sizing: border-box;
+  width: 100%;
+  overflow: hidden;
+  padding: 10px 8px 8px;
+  border: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--dsw-shadow-lv3);
+  color: var(--dsw-alias-label-primary);
+}
+
+.pluginHeading {
+  margin: 0 0 8px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xs-strong-13);
+}
+
+.pluginEmpty {
+  padding: 8px 4px 6px;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.pluginList {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--plugin-row-gap);
+  height: calc(var(--plugin-row-height) * 3.5 + var(--plugin-row-gap) * 3);
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.pluginRow {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: var(--plugin-row-height);
+}
+
+.pluginActions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.pluginIdentity {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+}
+
+.pluginName {
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-13);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pluginId {
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pluginAction {
+  flex: none;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xxs-12);
+  cursor: pointer;
+}
+
+.pluginAction:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.sessionGlyph {
+
+  display: flex;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.sessionItemActive .sessionGlyph,
+.sessionHit:hover .sessionGlyph,
+.newSession:hover .sessionGlyph {
+  border-color: var(--dsw-alias-border-l2);
+  background: color-mix(in srgb, var(--dsw-alias-bg-base) 55%, transparent);
+}
+
+.railReveal {
+  overflow: hidden;
+  opacity: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition: opacity 160ms ease;
+}
+
+.railOpen .railReveal {
+  opacity: 1;
+}
+
+.nameRow {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 32px;
+  margin-top: 2px;
+}
+
+.nameInput {
+  min-width: 0;
+  flex: 1;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.sessionLabel {
+  min-width: 0;
+  flex: 1;
+}
+
+.sessionActions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+
+.railOpen .sessionActions {
+  opacity: 0.42;
+  pointer-events: auto;
+}
+
+.railOpen .sessionItem:hover .sessionActions,
+.railOpen .sessionItem:focus-within .sessionActions {
+  opacity: 1;
+}
+
+.iconButton {
+  display: flex;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  background: color-mix(in srgb, var(--dsw-alias-bg-base) 55%, transparent);
+  color: var(--dsw-alias-label-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .window[data-geometry-animating] {
+    transition: none;
+  }
+
+  .rail,
+  .railReveal,
+  .sessionActions,
+  .minimizeButton,
+  .spriteLens {
+    transition: none;
+  }
+
+  .spriteBob {
+    animation: none;
+  }
+}
+
+.chatStack {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.chatSession {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  z-index: 0;
+}
+
+.chatSession[data-active] {
+  visibility: visible;
+  z-index: 1;
+}
+
+.transcriptHost {
+  position: absolute;
+  inset: 0;
+}
+
+.transcript {
+  height: 100%;
+  overflow: auto;
+  /* Bottom pad is set inline from the measured compose dock height. */
+  padding: 16px 16px 128px;
+  box-sizing: border-box;
+}
+
+.emptyHero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-sizing: border-box;
+  min-height: calc(100% - 8px);
+  padding: 32px 20px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.emptyHeroTitle {
+  margin: 0 0 4px;
+  color: var(--dsw-alias-label-primary);
+  font: 600 calc(22px * var(--cursor-overlay-type)) / 1.3 var(--dsw-font-family);
+  letter-spacing: -0.02em;
+}
+
+.emptyHeroTip {
+  margin: 0;
+  max-width: 28em;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.userBand {
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--dsw-alias-label-secondary) 14%, var(--dsw-alias-bg-base));
+  border: 1px solid var(--dsw-alias-border-l2);
+}
+
+.assistantBand {
+  margin: 0 0 10px;
+  padding: 2px 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.systemBand {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-secondary);
+  background: color-mix(in srgb, var(--dsw-alias-bg-overlay) 70%, transparent);
+}
+
+.userText {
+  margin: 0;
+  font: var(--dsw-font-xs-13);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.assistantMarkdown {
+  min-width: 0;
+  color: var(--dsw-alias-label-primary);
+}
+
+.auxRow {
+  margin: 2px 0;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+  line-height: 1.45;
+}
+
+.auxRow[data-streaming] {
+  color: color-mix(in srgb, var(--dsw-alias-label-tertiary) 88%, var(--dsw-alias-label-secondary));
+}
+
+.auxSummary {
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.auxSummary::-webkit-details-marker {
+  display: none;
+}
+
+.auxSummary::before {
+  content: '▸';
+  display: inline-block;
+  width: 1em;
+  margin-right: 2px;
+  color: color-mix(in srgb, var(--dsw-alias-label-tertiary) 80%, transparent);
+  transition: transform 120ms ease;
+}
+
+.auxRow[open] > .auxSummary::before {
+  transform: rotate(90deg);
+}
+
+.auxDetail {
+  margin: 4px 0 8px 1em;
+  max-height: 12em;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  background: color-mix(in srgb, var(--dsw-alias-bg-overlay) 55%, transparent);
+  color: var(--dsw-alias-label-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.runningRow {
+  margin: 8px 0 4px;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.tasksRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+  margin: 8px 0 2px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.tasksCount {
+  color: var(--dsw-alias-label-primary-bluish);
+}
+
+.queueFloat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-overlay) 94%, transparent);
+  box-shadow: var(--dsw-shadow-lv2);
+  backdrop-filter: blur(12px);
+}
+
+.queueFloatHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+}
+
+.queueFloatTitle {
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-strong-13);
+}
+
+.queueFloatHint {
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.queueFloatList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.queueFloatItem,
+.queueFloatItemLatest {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  color: var(--dsw-alias-label-primary-bluish);
+  font: var(--dsw-font-xs-13);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-2) 70%, transparent);
+}
+
+.queueFloatItemLatest {
+  outline: 1px solid var(--dsw-alias-border-l2);
+}
+
+.queueFloatActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.queueFloatAction,
+.queueFloatActionSecondary {
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  font: var(--dsw-font-xxs-12);
+  cursor: pointer;
+}
+
+.queueFloatAction {
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+}
+
+.queueFloatActionSecondary {
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.usageFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 0 14px;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.jumpBottom {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  z-index: 2;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-overlay) 92%, transparent);
+  box-shadow: var(--dsw-shadow-lv2);
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xxs-12);
+  cursor: pointer;
+}
+
+.composeDock {
+  position: absolute;
+  right: 20px;
+  bottom: 14px;
+  left: 20px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.selectionDialog,
+.suggestList {
+  margin: 0;
+  padding: 6px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-overlay) 94%, transparent);
+  box-shadow: var(--dsw-shadow-lv2);
+  backdrop-filter: blur(12px);
+}
+
+.selectionDialog {
+  padding: 10px 10px 8px;
+}
+
+.selectionHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 8px 10px;
+}
+
+.selectionTitle {
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-strong-13);
+}
+
+.selectionBody {
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.selectionContent {
+  margin-top: 4px;
+  color: var(--dsw-alias-label-primary-bluish);
+  font: var(--dsw-font-xs-strong-13);
+  word-break: break-all;
+}
+
+.selectionOptions,
+.suggestList ul,
+.mirrorList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 220px;
+  overflow: auto;
+}
+
+/* Frosted glass card for the CLI below-prompt mirror, floated above the composer. */
+.cliBelow {
+  position: relative;
+  margin: 0;
+  padding: 4px 8px;
+  list-style: none;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-overlay) 88%, transparent);
+  box-shadow: var(--dsw-shadow-lv3);
+  backdrop-filter: blur(14px);
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-13);
+  line-height: 1.2;
+  white-space: pre;
+  font-variant-ligatures: none;
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+}
+
+.cliBelow:focus-within {
+  outline: 2px solid var(--dsw-alias-border-l2);
+  outline-offset: 2px;
+}
+
+.cliBelowIme {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 4px;
+  height: 1.35em;
+  margin: 0;
+  padding: 0 4px;
+  border: 0;
+  overflow: hidden;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  font: inherit;
+  line-height: 1.35;
+  outline: none;
+}
+
+.cliBelowIme[data-composing] {
+  color: var(--dsw-alias-label-primary);
+  caret-color: var(--dsw-alias-label-primary);
+  background: color-mix(in srgb, var(--dsw-alias-bg-overlay) 92%, transparent);
+  border-radius: 6px;
+}
+
+.cliBelowRow {
+  min-height: 1.2em;
+  line-height: 1.2;
+  padding: 0 4px;
+  border-radius: 6px;
+}
+
+/* PTY blank rows: half line-height so consecutive newlines do not inflate the card. */
+.cliBelowRow[data-empty] {
+  min-height: 0.6em;
+  height: 0.6em;
+  line-height: 0.6;
+  padding: 0;
+  overflow: hidden;
+}
+
+.cliBelowRow[data-active] {
+  background: color-mix(in srgb, var(--dsw-alias-label-primary-bluish) 14%, transparent);
+}
+
+.mirrorList .suggestItem {
+  pointer-events: none;
+  cursor: default;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+}
+
+.selectionKey {
+  flex: none;
+  min-width: 2.2em;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.suggestItem {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  width: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-13);
+  text-align: left;
+  cursor: pointer;
+}
+
+.suggestItem[data-active] {
+  background: color-mix(in srgb, var(--dsw-alias-label-primary-bluish) 14%, var(--dsw-alias-bg-base));
+}
+
+.suggestId {
+  flex: none;
+  min-width: 7em;
+  color: var(--dsw-alias-label-primary-bluish);
+  font: var(--dsw-font-xs-strong-13);
+}
+
+.suggestMeta {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.suggestTitle {
+  color: var(--dsw-alias-label-primary);
+}
+
+.suggestDesc {
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer {
+  display: block;
+  margin: 0;
+}
+
+.composerStarting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: calc(24px + calc(13px * var(--cursor-overlay-type) * 1.4));
+  padding: 12px 16px;
+  border: 1.5px solid var(--dsw-alias-border-l2);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-overlay) 92%, var(--dsw-alias-bg-base));
+  box-shadow: var(--dsw-shadow-lv2);
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xs-13);
+  line-height: 1.4;
+  user-select: none;
+  pointer-events: none;
+}
+
+.composerInput {
+  /* Line box matches the xs-13 face at line-height 1.4; grow with draft up to 3.5 lines. */
+  --composer-lh: calc(13px * var(--cursor-overlay-type) * 1.4);
+  --composer-pad-y: 24px;
+  display: block;
+  width: 100%;
+  user-select: text;
+  min-height: calc(var(--composer-pad-y) + var(--composer-lh));
+  max-height: calc(var(--composer-pad-y) + var(--composer-lh) * 3.5);
+  box-sizing: border-box;
+  padding: 12px 16px;
+  border: 1.5px solid var(--dsw-alias-border-l2);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-overlay) 92%, var(--dsw-alias-bg-base));
+  box-shadow: var(--dsw-shadow-lv2);
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-13);
+  line-height: 1.4;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  resize: none;
+  outline: none;
+}
+
+.composerInput[data-overflow] {
+  overflow-y: auto;
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+  /* Narrow inset bar so the thumb sits inside the rounded pill, not on the rim. */
+  padding-right: 10px;
+}
+
+.composerInput[data-overflow]::-webkit-scrollbar {
+  width: 4px;
+}
+
+.composerInput[data-overflow]::-webkit-scrollbar-thumb {
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  border-radius: 4px;
+}
+
+.composerInput[data-overflow]::-webkit-scrollbar-track {
+  margin: 10px 0;
+  background: transparent;
+}
+
+.composerInput:focus {
+  border-color: color-mix(in srgb, var(--dsw-alias-label-primary-bluish) 55%, var(--dsw-alias-border-l2));
+}
+
+.composerInput:disabled {
+  opacity: 0.6;
+}
+
+.edge {
+  position: absolute;
+  z-index: 5;
+  touch-action: none;
+}
+
+/* n/s/e/w keep the 8px layout box. Only the outer --cursor-resize-hit strip
+   receives pointer events, so a themed 8px scrollbar under the same edge stays
+   clickable. Corners keep the full 12px hit. */
+.edgeN,
+.edgeS,
+.edgeE,
+.edgeW {
+  pointer-events: none;
+}
+
+.edgeN::before,
+.edgeS::before,
+.edgeE::before,
+.edgeW::before {
+  position: absolute;
+  pointer-events: auto;
+  content: '';
+}
+
+.edgeN {
+  top: 0;
+  right: 12px;
+  left: 12px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.edgeN::before {
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--cursor-resize-hit);
+}
+
+.edgeS {
+  right: 12px;
+  bottom: 0;
+  left: 12px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.edgeS::before {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: var(--cursor-resize-hit);
+}
+
+.edgeE {
+  top: 12px;
+  right: 0;
+  bottom: 12px;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.edgeE::before {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--cursor-resize-hit);
+}
+
+.edgeW {
+  top: 12px;
+  bottom: 12px;
+  left: 0;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.edgeW::before {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--cursor-resize-hit);
+}
+
+.edgeNe,
+.edgeNw,
+.edgeSe,
+.edgeSw {
+  z-index: 6;
+  width: 12px;
+  height: 12px;
+}
+
+.edgeNe {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+}
+
+.edgeNw {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+
+.edgeSe {
+  right: 0;
+  bottom: 0;
+  cursor: nwse-resize;
+}
+
+.edgeSw {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+}

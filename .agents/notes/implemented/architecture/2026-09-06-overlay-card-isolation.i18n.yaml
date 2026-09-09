@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-06-overlay-card-isolation.md
+2026-09-06-overlay-card-isolation.md: 33026020c6dd68008500125e31fc9f88898e7877
+2026-09-06-overlay-card-isolation.zh.md: 8f81a9c42476ef118f9f1d3a02f40f8300a32f62

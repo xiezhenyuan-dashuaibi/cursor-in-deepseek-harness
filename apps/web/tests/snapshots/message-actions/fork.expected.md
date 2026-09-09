@@ -1,0 +1,7 @@
+- tree "Sessions":
+  - treeitem "Ungrouped" [expanded]:
+    - img
+    - text: Ungrouped
+  - treeitem "Use the dsh_read tool twice (2) now" [selected]
+  - treeitem "Use the dsh_read tool twice (1) now"
+  - treeitem "Use the dsh_read tool twice 1min"

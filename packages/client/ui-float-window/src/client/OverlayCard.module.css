@@ -1,0 +1,689 @@
+.window {
+  --overlay-card-radius: 12px;
+  /* Thinner than the themed 8px scrollbar so the inner half of each edge stays clickable. */
+  --overlay-resize-hit: 4px;
+  --overlay-card-fill: color-mix(in srgb, var(--dsw-alias-bg-layer-1) 58%, transparent);
+  position: absolute;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  pointer-events: auto;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xxxs-11);
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2) 42%, transparent);
+  border-radius: var(--overlay-card-radius);
+  background: var(--overlay-card-fill);
+  box-shadow: var(--dsw-shadow-lv1);
+}
+
+.window:not(.tag) {
+  backdrop-filter: blur(16px);
+}
+
+.body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: auto;
+  padding: 0;
+}
+
+.body > * {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  width: 100%;
+}
+
+.empty {
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 24px 24px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-l-strong-18);
+}
+
+.header {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 3;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  /* Keep in sync with TITLE_BAR_HEIGHT in geometry.ts. */
+  height: 36px;
+  padding: 0 14px;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--dsw-alias-bg-layer-1) 92%, transparent) 0%,
+    color-mix(in srgb, var(--dsw-alias-bg-layer-1) 55%, transparent) 36%,
+    color-mix(in srgb, var(--dsw-alias-bg-layer-1) 18%, transparent) 68%,
+    transparent 100%
+  );
+  cursor: default;
+  user-select: none;
+  touch-action: none;
+}
+
+.identity {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: baseline;
+  gap: 8px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.name,
+.number {
+  overflow: hidden;
+  font: var(--dsw-font-xs-strong-13);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name {
+  color: var(--dsw-alias-label-primary);
+}
+
+.number {
+  flex: none;
+  color: var(--dsw-alias-label-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.trailing {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  cursor: default;
+}
+
+.minimize {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: default;
+}
+
+.minimize:hover,
+.minimize:focus-visible {
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-2) 70%, transparent);
+  color: var(--dsw-alias-label-primary);
+}
+
+.minimizeMark {
+  display: block;
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.tag {
+  /* Keep in sync with TAG_THICKNESS / TAG_NOTCH / TAG_TUCK / TAG_PEEK. */
+  --overlay-tag-notch: 10px;
+  --overlay-tag-tuck: 16px;
+  --overlay-tag-peek: 12px;
+  z-index: 200;
+  width: max-content;
+  max-width: 160px;
+  min-width: 0;
+  height: 32px;
+  overflow: visible;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  cursor: grab;
+  /* `none` is dropped at bundle time; blur(0) keeps frost off so clip-path shows. */
+  backdrop-filter: blur(0);
+  -webkit-backdrop-filter: blur(0);
+  background: var(--dsw-alias-bg-overlay);
+  filter:
+    drop-shadow(0 0 0.8px var(--dsw-alias-border-l2))
+    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.06));
+}
+
+.tag:not(.dragging):not(.floating):not(.morphing):not(.landing) {
+  transition: transform 160ms ease;
+}
+
+.tag.dragging {
+  cursor: grabbing;
+}
+
+.tag.floating {
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2) 42%, transparent);
+  border-radius: 8px;
+  box-shadow: var(--dsw-shadow-lv1);
+  clip-path: none;
+  filter: none;
+}
+
+.window.morphing {
+  --overlay-tag-notch: 10px;
+  --overlay-tag-tuck: 16px;
+  z-index: 300;
+  overflow: hidden;
+  pointer-events: none;
+  will-change: transform, clip-path;
+  /* Keep in sync with MORPH_MS in geometry.ts. */
+  transition:
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    clip-path 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    background 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    backdrop-filter 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.window.morphing.hold {
+  transition: none;
+}
+
+/* Keep in sync with SETTLE_MS in geometry.ts. */
+.window.morphing.dissolve {
+  border-color: transparent;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: blur(0);
+  -webkit-backdrop-filter: blur(0);
+}
+
+/* Five vertices, same winding as the destination swallowtail, so clip-path interpolates. */
+.window.morphing.toCard.left {
+  clip-path: polygon(0 0, 100% 0, 100% 50%, 100% 100%, 0 100%);
+}
+
+.window.morphing.toCard.right {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 0 50%);
+}
+
+.window.morphing.toCard.top {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 100%, 0 100%);
+}
+
+.window.morphing.toCard.bottom {
+  clip-path: polygon(0 0, 50% 0, 100% 0, 100% 100%, 0 100%);
+}
+
+.window.morphing.toTag {
+  border-color: transparent;
+  border-radius: 0;
+  background: var(--dsw-alias-bg-overlay);
+  box-shadow: none;
+  backdrop-filter: blur(0);
+  -webkit-backdrop-filter: blur(0);
+  filter:
+    drop-shadow(0 0 0.8px var(--dsw-alias-border-l2))
+    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.06));
+}
+
+.window.morphing .body,
+.window.morphing .handle,
+.window.morphing .trailing,
+.window.morphing .number,
+.window.morphing .header,
+.window.morphing .tagFace {
+  transition: opacity 320ms cubic-bezier(0.22, 1, 0.36, 1), background 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.window.morphing.hold .body,
+.window.morphing.hold .handle,
+.window.morphing.hold .trailing,
+.window.morphing.hold .number,
+.window.morphing.hold .header,
+.window.morphing.hold .tagFace {
+  transition: none;
+}
+
+.window.morphing.toTag .body,
+.window.morphing.toTag .handle,
+.window.morphing.toTag .trailing,
+.window.morphing.toTag .number,
+.window.morphing.dissolve .body,
+.window.morphing.dissolve .handle,
+.window.morphing.dissolve .trailing,
+.window.morphing.dissolve .number,
+.window.morphing.dissolve .header {
+  opacity: 0;
+}
+
+.window.morphing.toTag .header {
+  background: none;
+}
+
+.window.morphing .name {
+  transition: font-size 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.window.morphing.hold .name {
+  transition: none;
+}
+
+.window.morphing.toTag .name {
+  font: var(--dsw-font-xxxs-11);
+}
+
+.tagFace {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 6;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tag-w, 100%);
+  height: var(--tag-h, 100%);
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xxxs-11);
+  background: var(--dsw-alias-bg-overlay);
+  transform: scale(calc(1 / var(--morph-sx, 1)), calc(1 / var(--morph-sy, 1)));
+  transform-origin: 0 0;
+  filter:
+    drop-shadow(0 0 0.8px var(--dsw-alias-border-l2))
+    drop-shadow(0 1px 2px rgba(0, 0, 0, 0.06));
+}
+
+.tagFace .name {
+  font: var(--dsw-font-xxxs-11);
+}
+
+.window.morphing.dissolve .tagFace,
+.window.morphing.toTag .tagFace {
+  opacity: 1;
+}
+
+.window.morphing.play .tagFace {
+  opacity: 0;
+  transform: none;
+}
+
+.window.morphing.left .tagFace {
+  padding: 4px var(--overlay-tag-notch) 4px var(--overlay-tag-tuck);
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    calc(100% - var(--overlay-tag-notch)) 50%,
+    100% 100%,
+    0 100%
+  );
+}
+
+.window.morphing.right .tagFace {
+  padding: 4px var(--overlay-tag-tuck) 4px var(--overlay-tag-notch);
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% 100%,
+    0 100%,
+    var(--overlay-tag-notch) 50%
+  );
+}
+
+.window.morphing.top .tagFace,
+.window.morphing.bottom .tagFace {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+.window.morphing.top .tagFace {
+  padding: var(--overlay-tag-tuck) 4px var(--overlay-tag-notch) 4px;
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% 100%,
+    50% calc(100% - var(--overlay-tag-notch)),
+    0 100%
+  );
+}
+
+.window.morphing.bottom .tagFace {
+  padding: var(--overlay-tag-notch) 4px var(--overlay-tag-tuck) 4px;
+  clip-path: polygon(
+    0 0,
+    50% var(--overlay-tag-notch),
+    100% 0,
+    100% 100%,
+    0 100%
+  );
+}
+
+.tagProbe {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  font: var(--dsw-font-xxxs-11);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tagProbeVertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+.tag.morphing {
+  max-width: none;
+  max-height: none;
+}
+
+/* Same ribbon rotated: swallowtail on the free end that sticks into the board. */
+.tag.left,
+.tag.right {
+  justify-content: center;
+}
+
+.tag.left,
+.window.morphing.toTag.left {
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    calc(100% - var(--overlay-tag-notch)) 50%,
+    100% 100%,
+    0 100%
+  );
+}
+
+.tag.right,
+.window.morphing.toTag.right {
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% 100%,
+    0 100%,
+    var(--overlay-tag-notch) 50%
+  );
+}
+
+.tag.top,
+.tag.bottom {
+  width: 32px;
+  min-width: 32px;
+  max-width: none;
+  height: max-content;
+  min-height: 0;
+  max-height: 160px;
+}
+
+.tag.top,
+.window.morphing.toTag.top {
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% 100%,
+    50% calc(100% - var(--overlay-tag-notch)),
+    0 100%
+  );
+}
+
+.tag.bottom,
+.window.morphing.toTag.bottom {
+  clip-path: polygon(
+    0 0,
+    50% var(--overlay-tag-notch),
+    100% 0,
+    100% 100%,
+    0 100%
+  );
+}
+
+.tag.landing {
+  transition: none;
+}
+
+.tag.top:hover:not(.dragging):not(.floating):not(.morphing):not(.landing) {
+  transform: translateY(var(--overlay-tag-peek));
+}
+
+.tag.bottom:hover:not(.dragging):not(.floating):not(.morphing):not(.landing) {
+  transform: translateY(calc(-1 * var(--overlay-tag-peek)));
+}
+
+.tag.left:hover:not(.dragging):not(.floating):not(.morphing):not(.landing) {
+  transform: translateX(var(--overlay-tag-peek));
+}
+
+.tag.right:hover:not(.dragging):not(.floating):not(.morphing):not(.landing) {
+  transform: translateX(calc(-1 * var(--overlay-tag-peek)));
+}
+
+.tag .body,
+.tag .handle,
+.tag .trailing {
+  display: none;
+}
+
+.tag .header {
+  position: relative;
+  top: auto;
+  right: auto;
+  left: auto;
+  flex: none;
+  height: auto;
+  padding: 4px 6px;
+  background: none;
+  cursor: inherit;
+}
+
+.tag .number {
+  display: none;
+}
+
+.tag .name {
+  font: var(--dsw-font-xxxs-11);
+}
+
+.tag.left .name,
+.tag.right .name {
+  line-height: 1;
+}
+
+.tag .identity {
+  align-items: center;
+  gap: 0;
+}
+
+.tag.left .header,
+.tag.right .header {
+  box-sizing: border-box;
+  height: 100%;
+}
+
+.tag.left .header {
+  padding: 4px var(--overlay-tag-notch) 4px var(--overlay-tag-tuck);
+}
+
+.tag.right .header {
+  padding: 4px var(--overlay-tag-tuck) 4px var(--overlay-tag-notch);
+}
+
+.tag.top .header,
+.tag.bottom .header {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+.tag.top .header {
+  padding: var(--overlay-tag-tuck) 4px var(--overlay-tag-notch) 4px;
+}
+
+.tag.bottom .header {
+  padding: var(--overlay-tag-notch) 4px var(--overlay-tag-tuck) 4px;
+}
+
+.handle {
+  position: absolute;
+  z-index: 4;
+  touch-action: none;
+}
+
+/* n/s/e/w keep the 8px layout box. Only the outer --overlay-resize-hit strip
+   receives pointer events, so a themed 8px scrollbar under the same edge stays
+   clickable. Corners keep the full 12px hit. */
+.n,
+.s,
+.e,
+.w {
+  pointer-events: none;
+}
+
+.n::before,
+.s::before,
+.e::before,
+.w::before {
+  position: absolute;
+  pointer-events: auto;
+  content: '';
+}
+
+.n {
+  top: 0;
+  right: 10px;
+  left: 10px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.n::before {
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--overlay-resize-hit);
+}
+
+.s {
+  right: 10px;
+  bottom: 0;
+  left: 10px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.s::before {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: var(--overlay-resize-hit);
+}
+
+.e {
+  top: 10px;
+  right: 0;
+  bottom: 10px;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.e::before {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--overlay-resize-hit);
+}
+
+.w {
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.w::before {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--overlay-resize-hit);
+}
+
+.ne,
+.nw,
+.se,
+.sw {
+  width: 12px;
+  height: 12px;
+}
+
+.ne {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+}
+
+.nw {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+
+.se {
+  right: 0;
+  bottom: 0;
+  cursor: nwse-resize;
+}
+
+.sw {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tag:not(.dragging):not(.floating):not(.morphing) {
+    transition: none;
+  }
+
+  .window.morphing,
+  .window.morphing .body,
+  .window.morphing .handle,
+  .window.morphing .trailing,
+  .window.morphing .number,
+  .window.morphing .header,
+  .window.morphing .name,
+  .window.morphing .tagFace {
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .window {
+    border-color: var(--dsw-alias-border-l2);
+    background: var(--dsw-alias-bg-layer-1);
+  }
+
+  .window:not(.tag) {
+    backdrop-filter: none;
+  }
+
+  .header {
+    height: 36px;
+    padding: 0 14px;
+    background: color-mix(in srgb, var(--dsw-alias-bg-layer-1) 94%, transparent);
+  }
+}

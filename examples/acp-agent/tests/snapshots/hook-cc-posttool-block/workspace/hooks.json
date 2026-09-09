@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "dsh_bash",
+        "hooks": [
+          { "type": "command", "command": "sh posttool-once.sh" }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "steps": [
+    { "op": "initialize" },
+    { "op": "newSession" },
+    { "op": "prompt", "text": "Load the snapshot-skill skill with the dsh_skill tool, then reply DONE." }
+  ]
+}

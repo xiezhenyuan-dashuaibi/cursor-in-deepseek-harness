@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-07-26-ci-failover-runbook.md
+2026-07-26-ci-failover-runbook.md: 6e2e7384de331475b089c6a10efc44ba7599f004
+2026-07-26-ci-failover-runbook.zh.md: 13759b8a0f1b347b58499f6ea5e667d5df4d4d3b

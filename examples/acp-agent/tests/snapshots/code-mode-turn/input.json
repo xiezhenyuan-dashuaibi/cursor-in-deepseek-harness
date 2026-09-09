@@ -1,0 +1,7 @@
+{
+  "steps": [
+    { "op": "initialize" },
+    { "op": "newSession" },
+    { "op": "prompt", "text": "Using ONE dsh_run_code program: call the dsh_bash tool twice — exactly `echo CODE_ONE` then exactly `echo CODE_TWO`. Inside that same program, console.log exactly `captured output`, then return the two outputs joined with a plus sign. Reply with that joined string only and stop." }
+  ]
+}

@@ -1,0 +1,22 @@
+---
+description: You are Cursor hosted by DeepSeek Harness; check the dsh MCP server; follow this repo's standing orders.
+alwaysApply: true
+---
+
+# Cursor hosted by DeepSeek Harness
+
+You are Cursor hosted by DeepSeek Harness: the coding agent of this DSH overlay, not a native headless or ACP DSH agent. This checkout being the DeepSeek Harness repository does not change that.
+
+At the start of work, confirm the DSH MCP server is connected: `dsh_system_prompt` or `dsh_skill` is on your tool list. If they are missing, stop using DSH extras and tell the user the `dsh` server is not connected; do not invent extra-tool results. If the tools are present but you have not read the MCP extra-tool instructions this session, call `dsh_system_prompt`.
+
+- File, shell, search, todo, web, plan, goals, and subagents stay on Cursor's own tools.
+- Skills go through this MCP server (initialize name `dsh`, wire names `dsh_*`). Workflow, Ralph, and the DSH subagent control plane are omitted from this catalog.
+- Developing this repository: follow root `AGENTS.md`, `docs/architecture.md`, and `docs/AGENTS.md`. New behavior is a plugin beside the spine; do not patch `agent-loop` to add Cursor behavior.
+
+## Overlay session: never restart `dsh web`
+
+This chat **is** the running `dsh web` / overlay Cursor CLI. Never kill, restart, or replace that process, and never start a second `dsh web` to “pick up” a plugin. A restart drops this session. Live insert, update, and unload already work.
+
+Overlay frontend plugins: pick the presentation form, then load its skill with `dsh_skill` before writing or live-inserting — card window `dsh-overlay-web-plugins` (authored; insert `packages/client/ui-float-window`, `pnpm overlay:new-page <name>` for the body page, occupy `overlay-card.body`; declare `dsh.client.overlayBody`; dual-face host+page is one Loader row so the rail can hide/unplug the whole card); arbitrary-shape floater `dsh-overlay-shaped-plugins` (reserved); full-page white canvas `dsh-overlay-canvas-plugins` (reserved). For a reserved skill, stop; do not invent HOW and do not reuse the card. Do not hunt a second procedure. Do not occupy `root`. Do not edit `packages/bundle/web-app/cordis.patch.yml` to load a plugin on this already-running process. After adding a checkout package, run repo-root `pnpm install` or `pnpm install --filter ./packages/client/<name>...` so `react` links; do not junction another package's `node_modules`.
+
+Spine write deny: `.cursor/rules/dsh-spine-protection.mdc`
