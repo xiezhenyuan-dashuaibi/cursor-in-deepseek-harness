@@ -21,35 +21,35 @@ describe('overlay card frame storage', () => {
   it('round-trips frames, front, and per-card docks, skipping unknown ids', () => {
     writePersistedCardFrames({
       frames: {
-        barber: { x: 40, y: 80, width: 500, height: 400 },
+        draft: { x: 40, y: 80, width: 500, height: 400 },
         '1': { x: 36, y: 56, width: 360, height: 280 },
       },
-      front: ['1', 'barber', '1', 'nope!'],
+      front: ['1', 'draft', '1', 'nope!'],
       docks: {
-        barber: { edge: 'left', along: 80 },
+        draft: { edge: 'left', along: 80 },
         'nope!': { edge: 'top', along: 0 },
       },
       parks: {
-        barber: { edge: 'bottom', along: 24 },
+        draft: { edge: 'bottom', along: 24 },
         'nope!': { edge: 'top', along: 0 },
       },
     })
     expect(readPersistedCardFrames()).toEqual({
       frames: {
-        barber: { x: 40, y: 80, width: 500, height: 400 },
+        draft: { x: 40, y: 80, width: 500, height: 400 },
         '1': { x: 36, y: 56, width: 360, height: 280 },
       },
-      front: ['1', 'barber'],
-      docks: { barber: { edge: 'left', along: 80 } },
-      parks: { barber: { edge: 'bottom', along: 24 } },
+      front: ['1', 'draft'],
+      docks: { draft: { edge: 'left', along: 80 } },
+      parks: { draft: { edge: 'bottom', along: 24 } },
     })
   })
 
   it('snapshots only seats that have both identity and frame', () => {
     expect(snapshotCardLayout(
       {
-        1: { id: 'barber' },
-        2: { id: 'hub' },
+        1: { id: 'draft' },
+        2: { id: 'other' },
         3: { id: 'bad id!' },
         4: undefined,
       },
@@ -70,10 +70,10 @@ describe('overlay card frame storage', () => {
         9: { edge: 'right', along: 0 },
       },
     )).toEqual({
-      frames: { barber: { x: 10, y: 20, width: 360, height: 280 } },
-      front: ['barber'],
-      docks: { barber: { edge: 'bottom', along: 24 } },
-      parks: { barber: { edge: 'left', along: 80 } },
+      frames: { draft: { x: 10, y: 20, width: 360, height: 280 } },
+      front: ['draft'],
+      docks: { draft: { edge: 'bottom', along: 24 } },
+      parks: { draft: { edge: 'left', along: 80 } },
     })
   })
 

@@ -36,6 +36,7 @@
   --dsw-font-xs-13: calc(13px * var(--cursor-overlay-type)) / calc(20px * var(--cursor-overlay-type)) var(--dsw-font-family);
   --dsw-font-xs-strong-13: 500 calc(13px * var(--cursor-overlay-type)) / calc(20px * var(--cursor-overlay-type)) var(--dsw-font-family);
   --dsw-font-xxs-12: calc(12px * var(--cursor-overlay-type)) / calc(18px * var(--cursor-overlay-type)) var(--dsw-font-family);
+  --dsw-font-xxxs-11: calc(11px * var(--cursor-overlay-type)) / calc(14px * var(--cursor-overlay-type)) var(--dsw-font-family);
   /* Markdown body matches user/composer xs-13; headings step up from that face. */
   --dsw-font-markdown-h1: 700 calc(18px * var(--cursor-overlay-type)) / calc(26px * var(--cursor-overlay-type)) var(--dsw-font-family);
   --dsw-font-markdown-h2: 700 calc(16px * var(--cursor-overlay-type)) / calc(24px * var(--cursor-overlay-type)) var(--dsw-font-family);
@@ -151,6 +152,28 @@
   touch-action: none;
 }
 
+.mcpStatus {
+  position: absolute;
+  top: 10px;
+  left: 8px;
+  z-index: 3;
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxxs-11);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.mcpStatus[data-connected='connected'] {
+  color: var(--dsw-alias-label-primary);
+  font-weight: 700;
+}
+
+.mcpStatus[data-connected='disconnected'] {
+  color: var(--dsw-alias-label-primary);
+  font-weight: 400;
+}
+
 .minimizeButton {
   position: absolute;
   top: 8px;
@@ -220,13 +243,14 @@
   box-shadow: none;
   white-space: nowrap;
   pointer-events: none;
-  /* Lighter status hues at 50% opacity — less shouty than primary green/red. */
+  /* Error stays a muted red; live uses primary black, not status green. */
   color: color-mix(in srgb, var(--dsw-alias-state-error-secondary) 50%, transparent);
   font: var(--dsw-font-xxs-12);
 }
 
 .spriteHint[data-sprite-status='live'] {
-  color: color-mix(in srgb, var(--dsw-alias-state-success-secondary) 50%, transparent);
+  color: var(--dsw-alias-label-primary);
+  font-weight: 700;
 }
 
 .spriteBob {
@@ -519,6 +543,18 @@
   margin: 0 0 8px;
   color: var(--dsw-alias-label-secondary);
   font: var(--dsw-font-xs-strong-13);
+}
+
+.pluginDesktop {
+  margin: 0 0 8px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
+}
+
+.pluginDesktopLabel {
+  margin: 0 0 6px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxxs-11);
 }
 
 .pluginEmpty {
@@ -993,6 +1029,7 @@
   z-index: 2;
   display: flex;
   flex-direction: column;
+  min-width: 0;
   gap: 4px;
   padding: 0;
   border: none;
@@ -1052,11 +1089,16 @@
 /* Frosted glass card for the CLI below-prompt mirror, floated above the composer. */
 .cliBelow {
   position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   margin: 0;
   padding: 4px 8px;
   list-style: none;
   max-height: 220px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 16px;
   background: color-mix(in srgb, var(--dsw-alias-bg-overlay) 88%, transparent);
@@ -1065,7 +1107,9 @@
   color: var(--dsw-alias-label-primary);
   font: var(--dsw-font-xs-13);
   line-height: 1.2;
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   font-variant-ligatures: none;
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
@@ -1106,6 +1150,8 @@
   line-height: 1.2;
   padding: 0 4px;
   border-radius: 6px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* PTY blank rows: half line-height so consecutive newlines do not inflate the card. */

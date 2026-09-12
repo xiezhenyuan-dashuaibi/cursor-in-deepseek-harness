@@ -42,6 +42,11 @@ export type ChatSessionProps = {
   /** Report connecting / live / disconnected for the chrome status. */
   onStatus: (sessionId: OverlaySessionId, status: 'connecting' | 'live' | 'disconnected') => void
   /**
+   * Report `{op:"dsh_mcp"}` / `snapshot.dshMcp` for the drag-strip chrome.
+   * Omitted in tests that do not assert overlay chrome.
+   */
+  onDshMcp?: (sessionId: OverlaySessionId, status: DshMcpChromeStatus) => void
+  /**
    * Register a host shutdown sender for the rail close control.
    * Socket close without this call leaves the Cursor CLI running.
    */
@@ -109,8 +114,13 @@ function draftAfterFailure(current: string, message: string | undefined): string
   return current
 }
 
-/** Delay before a dropped socket is opened again (visibility kicks immediately). */
-const RECONNECT_MS = 400
+/** Values on `{op:"dsh_mcp"}.status` and `snapshot.dshMcp`. */
+export type DshMcpChromeStatus = 'checking' | 'connected' | 'disconnected'
+
+function readDshMcpStatus(value: unknown): DshMcpChromeStatus | undefined {
+  if (value === 'connected' || value === 'disconnected' || value === 'checking') return value
+  return undefined
+}
 
 /**
  * Mount one WebSocket chat session over `/cursor-agent`.
@@ -130,6 +140,7 @@ export function ChatSession({
   sessionId,
   active,
   onStatus,
+  onDshMcp,
   registerShutdown,
   labels,
 }: ChatSessionProps) {
@@ -268,6 +279,13 @@ export function ChatSession({
       const op = record.op
       if (op === 'snapshot') {
         applySnapshot(record)
+        const listed = readDshMcpStatus(record.dshMcp)
+        if (listed !== undefined) onDshMcp?.(sessionId, listed)
+        return
+      }
+      if (op === 'dsh_mcp') {
+        const listed = readDshMcpStatus(record.status)
+        if (listed !== undefined) onDshMcp?.(sessionId, listed)
         return
       }
       if (op === 'status') {
@@ -384,7 +402,7 @@ export function ChatSession({
       }
       socketRef.current = null
     }
-  }, [sessionId, onStatus, registerShutdown])
+  }, [sessionId, onStatus, onDshMcp, registerShutdown])
 
   useLayoutEffect(() => {
     if (!active || !stickRef.current) return
@@ -398,12 +416,12 @@ export function ChatSession({
     const input = composerRef.current
     /* v8 ignore next -- the composer mounts with the active near-bottom dock. */
     if (input === null) return
+    syncComposerHeight(input)
     const caret = pendingCaretRef.current
     if (caret !== undefined) {
       pendingCaretRef.current = undefined
       input.setSelectionRange(caret, caret)
     }
-    syncComposerHeight(input)
   }, [draft, active, nearBottom, below, cliReady, queuedFollowUps.length])
 
   useLayoutEffect(() => {
@@ -1041,9 +1059,14 @@ function formatToolSummary(
 
 /**
  * Grow the composer with its draft; show a scrollbar only past the 3.5-line cap.
+ * Chromium moves the caret to the end on each `style.height` write; this
+ * function restores the selection captured before those writes. Callers that
+ * queued `pendingCaretRef` must apply that offset after this returns.
  * @param input - the visible compose textarea.
  */
 function syncComposerHeight(input: HTMLTextAreaElement): void {
+  const start = input.selectionStart
+  const end = input.selectionEnd
   input.style.height = 'auto'
   input.removeAttribute('data-overflow')
   const maxHeight = Number.parseFloat(getComputedStyle(input).maxHeight)
@@ -1051,9 +1074,10 @@ function syncComposerHeight(input: HTMLTextAreaElement): void {
   if (Number.isFinite(maxHeight) && contentHeight > maxHeight + 0.5) {
     input.style.height = `${String(maxHeight)}px`
     input.setAttribute('data-overflow', '')
-    return
+  } else {
+    input.style.height = `${String(contentHeight)}px`
   }
-  input.style.height = `${String(contentHeight)}px`
+  input.setSelectionRange(start, end)
 }
 
 /**

@@ -72,9 +72,9 @@ function writePackage(root: string, dirName: string): void {
 
 describe('overlay-page-checkout', () => {
   it('drops an exact quoted list item and keeps a longer sibling name', () => {
-    const ids = "const OMITTED_IDS = ['ui-lab', 'ui-lab-peer', 'ui-barber'] as const"
+    const ids = "const OMITTED_IDS = ['ui-lab', 'ui-lab-peer', 'ui-other'] as const"
     expect(dropQuotedListItem(ids, 'ui-lab')).toBe(
-      "const OMITTED_IDS = ['ui-lab-peer', 'ui-barber'] as const",
+      "const OMITTED_IDS = ['ui-lab-peer', 'ui-other'] as const",
     )
     const pkgs = [
       'const OMITTED_PACKAGES = [',
@@ -130,6 +130,7 @@ describe('overlay-page-checkout', () => {
     seedLanding(root)
     writePackage(root, 'ui-notes')
     writePackage(root, 'ui-float-window')
+    writePackage(root, 'ui-overlay-desktop')
     writePackage(root, 'ui-cursor-agent')
     landCheckoutSurfaces(root, {
       dirName: 'ui-notes',
@@ -137,9 +138,11 @@ describe('overlay-page-checkout', () => {
     })
     expect(isLabOverlayOccupant(root, 'ui-notes')).toBe(true)
     expect(isLabOverlayOccupant(root, 'ui-float-window')).toBe(false)
+    expect(isLabOverlayOccupant(root, 'ui-overlay-desktop')).toBe(false)
     expect(isLabOverlayOccupant(root, 'ui-cursor-agent')).toBe(false)
     expect(purgeCheckoutOccupant(root, 'ui-notes')).toBe(true)
     expect(purgeCheckoutOccupant(root, 'ui-float-window')).toBe(false)
+    expect(purgeCheckoutOccupant(root, 'ui-overlay-desktop')).toBe(false)
     expect(purgeCheckoutOccupant(root, 'ui-cursor-agent')).toBe(false)
     expect(() => readFileSync(join(root, 'packages', 'client', 'ui-notes', 'package.json'))).toThrow()
     expect(readFileSync(join(root, 'packages', 'client', 'ui-float-window', 'package.json'), 'utf8')).toContain(

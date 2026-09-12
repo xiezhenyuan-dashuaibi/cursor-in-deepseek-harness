@@ -58,7 +58,7 @@ export function spawnNodePtySession(
     file,
     args,
     cwd: options.cwd,
-    env: scrubbedParentEnv(),
+    env: { ...scrubbedParentEnv(), ...options.env },
   })
   const term = nodePty.spawn(fenced.file, [...fenced.args], {
     name: 'xterm-256color',

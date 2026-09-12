@@ -39,6 +39,9 @@
       "path": "../mcp-prompt"
     },
     {
+      "path": "../../host/webserver"
+    },
+    {
       "path": "../../skill/skill"
     },
     {

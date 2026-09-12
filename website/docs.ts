@@ -417,6 +417,14 @@ const reference = [
     section: { root: '开发手册', en: 'Cookbook' },
     order: 5,
   }]),
+  ...pairedPages([{
+    source: 'docs/cookbook/overlay-desktop-plugins.md',
+    route: 'reference/cookbook/overlay-desktop-plugins.md',
+    label: { root: 'Overlay 桌面插件', en: 'Overlay desktop plugins' },
+    sidebar: { root: 'zh-reference', en: 'en-reference' },
+    section: { root: '开发手册', en: 'Cookbook' },
+    order: 6,
+  }]),
 ]
 
 /** A sidebar group, matched to pages by `label`. */

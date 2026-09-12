@@ -9,6 +9,7 @@
 import { randomUUID } from 'node:crypto'
 import type { IncomingMessage } from 'node:http'
 import type { Duplex } from 'node:stream'
+import { cursorMcpAttachUrl } from '@deepseek-ai/dsh-cursor-mcp-server'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import {
@@ -67,6 +68,12 @@ export type { MirrorBelowLine, PromptMirror } from './prompt-mirror.ts'
 export { ScreenBuffer } from './screen-buffer.ts'
 export { BUNDLED_CLI_ROOT, resolveAgentArgv, resolveBundledAgent } from './resolve-agent.ts'
 export type { AgentArgv } from './resolve-agent.ts'
+export {
+  buildMcpListArgs,
+  DSH_MCP_LIST_TIMEOUT_MS,
+  dshMcpConnectedFromCliOutput,
+} from './dsh-mcp-status.ts'
+export type { DshMcpWireStatus } from './dsh-mcp-status.ts'
 
 /** Stable Cordis plugin name. */
 export const name = 'cursor-agent-gateway'
@@ -166,6 +173,7 @@ export function mountCursorAgentGateway(
         logConversations,
         conversationLogDir,
         maxLogFileBytes,
+        mcpAttachUrl: cursorMcpAttachUrl(ctx.webServer.port),
       }, server, spawnChild, runtimes)
     },
   }
@@ -194,6 +202,7 @@ function acceptUpgrade(
     readonly logConversations: boolean
     readonly conversationLogDir: string
     readonly maxLogFileBytes: number
+    readonly mcpAttachUrl: string
   },
   server: WebSocketServer,
   spawnChild: SpawnAgentChild | undefined,
@@ -227,6 +236,7 @@ function acceptUpgrade(
       const runtime = createAgentChatRuntime({
         ...argv,
         cwd: config.cwd,
+        mcpAttachUrl: config.mcpAttachUrl,
         ...(log !== undefined ? { log } : {}),
         ...(spawnChild !== undefined ? { spawnChild } : {}),
       }, {

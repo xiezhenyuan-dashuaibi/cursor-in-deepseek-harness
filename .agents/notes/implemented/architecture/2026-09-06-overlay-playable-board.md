@@ -12,7 +12,7 @@ Overlay cards share `shell.overlay` with sibling occupants. Origin clamp used to
 
 The playable board is the overlay layer box, not the browser window.
 
-[`ui-layout`](../../../../packages/client/ui-layout/README.md) `AppFrame` `.overlayLayer` (`data-shell-overlay`) clips occupants on all four sides (`overflow: hidden`) and stays click-through. Direct children opt into pointer events except `[data-overlay-board]`, so a full-size clip board does not steal empty-space hits from sibling overlay entries. [`ui-cursor-agent`](../../../../packages/client/ui-cursor-agent/README.md) paints that same node (`background: var(--dsw-alias-bg-base)`) and also clips overflow. This is still `shell.overlay`, not the reserved full-page canvas form.
+[`ui-layout`](../../../../packages/client/ui-layout/README.md) `AppFrame` `.overlayLayer` (`data-shell-overlay`) clips occupants on all four sides (`overflow: hidden`) and stays click-through. Direct children opt into pointer events except `[data-overlay-board]`, so a full-size clip board does not steal empty-space hits from sibling overlay entries. [`ui-cursor-agent`](../../../../packages/client/ui-cursor-agent/README.md) paints that same node (`background: var(--dsw-alias-bg-base)`) and also clips overflow. This is still `shell.overlay`. The desktop form occupies `overlay-desktop.body` on this layer ([desktop host](2026-09-10-overlay-desktop-host.md)).
 
 [`OverlayDesk`](../../../../packages/client/ui-float-window/README.md) wraps cards in a board (`position: absolute; inset: 0; overflow: hidden; pointer-events: none`) marked `data-overlay-board`. Card `left` / `top` are board-local. A `ResizeObserver` writes the board size into the desk store and reclamps every origin. Drag converts `clientX` / `clientY` through the board's `getBoundingClientRect()`.
 
@@ -28,7 +28,7 @@ Grab-strip clamp: `x` in `[120 - width, canvas.width - 120]`, `y` in `[0, canvas
 
 **Clamp only in `ui-float-window` against `window.innerWidth`.** Rejected — the overlay box is not the window, and a fragment desk has no containing block of its own. Cards parked past the painted board still disappear.
 
-**Occupy `root` or invent the full-page canvas HOW.** Rejected — the white board here is the existing `shell.overlay` layer. The page-canvas skill is a reserved slot.
+**Occupy `root`.** Rejected — the white board here is the existing `shell.overlay` layer. Desktop HOW occupies `overlay-desktop.body` on this layer; occupying `root` stays forbidden.
 
 ## Consequences
 

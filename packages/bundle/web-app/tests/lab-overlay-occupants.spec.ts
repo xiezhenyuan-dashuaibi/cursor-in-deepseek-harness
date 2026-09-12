@@ -9,12 +9,13 @@ import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const OMITTED_IDS = ['ui-petshop-store', 'ui-petshop-hub', 'ui-petshop', 'ui-barber'] as const
+const OMITTED_IDS = ['ui-dopamine-desk', 'ui-black-hole', 'ui-koi-pond', 'ui-office-desk', 'ui-overlay-desktop'] as const
 const OMITTED_PACKAGES = [
-  '@deepseek-ai/dsh-client-ui-petshop-store',
-  '@deepseek-ai/dsh-client-ui-petshop-hub',
-  '@deepseek-ai/dsh-client-ui-petshop',
-  '@deepseek-ai/dsh-client-ui-barber',
+  '@deepseek-ai/dsh-client-ui-dopamine-desk',
+  '@deepseek-ai/dsh-client-ui-black-hole',
+  '@deepseek-ai/dsh-client-ui-moyu-tank',
+  '@deepseek-ai/dsh-client-ui-office-desk',
+  '@deepseek-ai/dsh-client-ui-overlay-desktop',
 ] as const
 
 describe('web-app roster omits inventory packages absent from this bundle', () => {

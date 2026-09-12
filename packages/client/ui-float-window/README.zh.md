@@ -16,7 +16,7 @@ pnpm overlay:live insert packages/client/ui-float-window --title 草稿 --card-i
 pnpm overlay:live remove overlay-card-draft
 ```
 
-第一次插入在省略标志时挂上 `卡片 1`、360×280。该插入还会在 profile 还没有 overlay-card RPC 行时写入 `./overlay-card-roster-rpc.mjs`，因此即使本进程已经缓存了 npm 包的 `apply`，`/overlay-card` 仍能挂上；并写入 `./overlay-card-plug-rpc.mjs`，以便在第一次 `/overlay-card` 仍是只读 list 时也能挂上隐藏和插入写入。之后再插入本包会追加下一条 spec（最多 8 张），不会再写第二行 Loader，也不会再复制 `lib/`。`remove overlay-card-<id>` 去掉那扇窗。`remove ui-float-window`（或该 Loader id）卸载整张桌面。页面插件为 `SlotMap` type-import `@deepseek-ai/dsh-client-ui-float-window/client`，并注册进 `overlay-card.body`（或 `overlay-card-N.body`）。页面包声明 `dsh.client.overlayBody`，以便 `overlay:live insert` 记录占用。操作 HOW：[dsh-overlay-web-plugins](../../../.agents/skills/dsh-overlay-web-plugins/SKILL.md)。
+第一次插入在省略标志时挂上 `卡片 1`、360×280。该插入还会在 profile 还没有 overlay-card RPC 行时写入 `./overlay-card-roster-rpc.mjs`，因此即使本进程已经缓存了 npm 包的 `apply`，`/overlay-card` 仍能挂上；并写入 `./overlay-card-plug-rpc.mjs`，以便在第一次 `/overlay-card` 仍是只读 list 时也能挂上隐藏和插入写入。之后再插入本包会追加下一条 spec，不会再写第二行 Loader，也不会再复制 `lib/`。`remove overlay-card-<id>` 去掉那扇窗。`remove ui-float-window`（或该 Loader id）卸载整张桌面。页面插件为 `SlotMap` type-import `@deepseek-ai/dsh-client-ui-float-window/client`，并注册进 `overlay-card.body`（或 `overlay-card-N.body`）。页面包声明 `dsh.client.overlayBody`，以便 `overlay:live insert` 记录占用。操作 HOW：[dsh-overlay-web-plugins](../../../.agents/skills/dsh-overlay-web-plugins/SKILL.md)。
 
 ## Model Experience
 
@@ -34,5 +34,5 @@ None; this package neither assembles nor sends a provider request.
 - **右侧铬框按卡片分开** — 给内置缩小旁边的额外控件的 list 槽。那里的指针事件不会开始拖动，但仍会把窗口置顶。没有占用者时该区域空白。缩小是 OverlayCard 铬框，不是这个槽。
 - **插入标志不是 Loader `config`** — `overlay:live` 仍只写 Loader `{ id, name }`；标题、唯一 id 和开场尺寸在 `instances.json`。页面 `preferFrame` 仍可在首次挂载时改尺寸；已存储的外框或用户拖动/缩放会忽略之后的调用。
 - **现场 `/overlay-card` 走 profile 相对模块** — Node 会缓存本包名的第一次 `apply`。`overlay:live insert` 或 `update` 在 profile 还没有 overlay-card RPC 行时写入 `./overlay-card-roster-rpc.mjs`，并写入 `./overlay-card-plug-rpc.mjs`，以便第一次 `/overlay-card` 仍是只读 list 时，`instances.setHidden` 和 `occupants.setInserted` 能挂上 `/overlay-card-plug`。卡片 `update` 在第一个 plug-rpc URL 已被缓存时，会把该 Loader `name` 改到 `./overlay-card-hide-rpc.mjs`。source launch 本包时读现场 `plugins/*/instances.json`，不是 checkout 里默认的一张卡片。
-- **最多八张卡片** — 窗体槽预先声明到 `overlay-card-8.body`。
+- **窗体槽随名册增长** — OverlayDesk 按块（8、16、32、…）预先声明 `overlay-card.body` 和 `overlay-card-N.body`（N ≥ 2）。跨过一块会重挂桌面，页面重新 inject。`remove overlay-card-<id>` 之后座位不复用。
 - **隐藏保留 spec；拔出保留现场副本** — `hidden: true` 跳过窗口。占用者 `disabled: true` 暂停该 Loader fiber。两者都不删除 `instances.json` 行或 checkout 包。插件浮层不调用 `overlay:live remove`。

@@ -12,7 +12,7 @@ Overlay 卡片与兄弟占用者共用 `shell.overlay`。原点钳位以前只�
 
 可玩白板是 overlay 层的盒子，不是浏览器窗口。
 
-[`ui-layout`](../../../../packages/client/ui-layout/README.md) 的 `AppFrame` `.overlayLayer`（`data-shell-overlay`）四面裁剪占用者（`overflow: hidden`），层本身仍点击穿透。直接子节点自行恢复指针事件，但 `[data-overlay-board]` 除外，这样全幅裁剪板不会抢走兄弟 overlay 条目的空白命中。[`ui-cursor-agent`](../../../../packages/client/ui-cursor-agent/README.md) 给同一节点涂底（`background: var(--dsw-alias-bg-base)`）并同样裁剪 overflow。这仍是 `shell.overlay`，不是预留的整页画板形态。
+[`ui-layout`](../../../../packages/client/ui-layout/README.md) 的 `AppFrame` `.overlayLayer`（`data-shell-overlay`）四面裁剪占用者（`overflow: hidden`），层本身仍点击穿透。直接子节点自行恢复指针事件，但 `[data-overlay-board]` 除外，这样全幅裁剪板不会抢走兄弟 overlay 条目的空白命中。[`ui-cursor-agent`](../../../../packages/client/ui-cursor-agent/README.md) 给同一节点涂底（`background: var(--dsw-alias-bg-base)`）并同样裁剪 overflow。这仍是 `shell.overlay`。桌面形态在这一层占据 `overlay-desktop.body`（[桌面基模](2026-09-10-overlay-desktop-host.md)）。
 
 [`OverlayDesk`](../../../../packages/client/ui-float-window/README.md) 用一块板包住卡片（`position: absolute; inset: 0; overflow: hidden; pointer-events: none`），并打上 `data-overlay-board`。卡片的 `left` / `top` 相对这块板。`ResizeObserver` 把板的尺寸写入桌面 store 并重新钳每个原点。拖动把 `clientX` / `clientY` 经板的 `getBoundingClientRect()` 换算。
 
@@ -28,7 +28,7 @@ Overlay 卡片与兄弟占用者共用 `shell.overlay`。原点钳位以前只�
 
 **只在 `ui-float-window` 里用 `window.innerWidth` 钳。** 否决——overlay 盒子不是窗口，片段桌面也没有自己的包含块。停在涂白板之外的卡片照样消失。
 
-**占据 `root` 或发明整页画板 HOW。** 否决——这里的白板就是现有的 `shell.overlay` 层。整页画板技能是预留槽。
+**占据 `root`。** 否决——这里的白板就是现有的 `shell.overlay` 层。桌面 HOW 在这一层占据 `overlay-desktop.body`；占据 `root` 仍然禁止。
 
 ## Consequences
 

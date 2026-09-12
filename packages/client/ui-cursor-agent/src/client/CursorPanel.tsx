@@ -10,7 +10,7 @@ import {
   IconEditOutline16,
   IconPlusOutline16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { ChatSession } from './ChatSession.tsx'
+import { ChatSession, type DshMcpChromeStatus } from './ChatSession.tsx'
 import { cursorAgentChatUrl } from './chat-url.ts'
 import {
   clampOverlayBox,
@@ -27,7 +27,8 @@ import {
   mintOverlaySessionId,
   type OverlaySessionId,
 } from './session-id.ts'
-import { readPersistedRail, writePersistedRail } from './rail-storage.ts'
+import { persistLiveRail, readPersistedRail } from './rail-storage.ts'
+import { readHostBootId } from './host-boot.ts'
 import { hydrateOverlayGeometry, writePersistedGeometry } from './geometry-storage.ts'
 import {
   headingToOpeningDegrees,
@@ -44,20 +45,35 @@ export { cursorAgentChatUrl as cursorAgentPtyUrl }
 export type CursorAgentInjected = {
   /** Raise this window in `ctx.overlayStack`. */
   raiseWindow: () => void
-  /** List overlay-card specs (name + unique id + hidden + inserted). */
+  /** List card windows, the pinned desktop occupant, and standalone overlay fibers. */
   listOverlayCards: () => Promise<readonly OverlayCardManagerItem[]>
   /**
-   * Hide or show one overlay card by unique id.
-   * @param id - `--card-id`.
-   * @param hidden - `true` skips the window; `false` shows it when inserted.
+   * Hide or show one rail row.
+   * @param id - `--card-id` or standalone Loader id.
+   * @param hidden - `true` skips the window.
+   * @param kind - `fiber` / `desktop` reject hide.
    */
-  setOverlayCardHidden: (id: string, hidden: boolean) => Promise<void>
+  setOverlayCardHidden: (
+    id: string,
+    hidden: boolean,
+    kind?: OverlayCardManagerItem['kind'],
+  ) => Promise<void>
   /**
-   * Insert or unplug occupant fibers for one overlay card.
-   * @param id - `--card-id`.
-   * @param inserted - `false` sets Loader `disabled: true` on occupants.
+   * Insert or unplug occupant fibers for one rail row.
+   * @param id - `--card-id` or standalone Loader id.
+   * @param inserted - `false` sets Loader `disabled: true`.
+   * @param kind - `fiber` / `desktop` writes that Loader row.
    */
-  setOverlayCardInserted: (id: string, inserted: boolean) => Promise<void>
+  setOverlayCardInserted: (
+    id: string,
+    inserted: boolean,
+    kind?: OverlayCardManagerItem['kind'],
+  ) => Promise<void>
+  /**
+   * Exclusive-enable one overlay-desktop.body occupant.
+   * @param id - Loader id of the desktop occupant.
+   */
+  switchOverlayDesktop: (id: string) => Promise<void>
   hooks: {
     /** Cursor window vs overlay-card desk in `shell.overlay`. */
     overlayStack: HostObservable<OverlayStackSnapshot>
@@ -71,6 +87,24 @@ export type CursorPanelProps =
   & InjectFace<CursorAgentInjected>
 
 type OverlayStatus = 'connecting' | 'live' | 'disconnected'
+
+function mcpChromeLabel(
+  status: DshMcpChromeStatus,
+  t: (key: 'mcp.checking' | 'mcp.connected' | 'mcp.disconnected') => string,
+): string {
+  switch (status) {
+    case 'connected':
+      return t('mcp.connected')
+    case 'checking':
+      return t('mcp.checking')
+    case 'disconnected':
+      return t('mcp.disconnected')
+    default: {
+      const exhausted: never = status
+      return exhausted
+    }
+  }
+}
 
 type SessionRow = {
   id: OverlaySessionId
@@ -124,7 +158,8 @@ function hydrateSessions(): {
   activeId: OverlaySessionId
   ordinal: number
 } {
-  const stored = readPersistedRail()
+  const bootId = readHostBootId()
+  const stored = bootId === undefined ? undefined : readPersistedRail(bootId)
   if (stored === undefined) {
     const seed = createSession(1)
     return { sessions: [seed], activeId: seed.id, ordinal: 1 }
@@ -261,7 +296,8 @@ function MinimizeIcon({ size = 16 }: { size?: number }) {
  * travel expands it again.
  * Chat sessions stay mounted while minimized. The host Cursor CLI outlives
  * the WebSocket: hiding or closing the page only detaches the viewer, and the
- * overlay reconnects to the same session id. The rail close control is the
+ * overlay reconnects to the same session id while this `dsh web` process is
+ * up. A new process starts the rail at Chat 1. The rail close control is the
  * only overlay gesture that sends `{op:"shutdown"}`.
  * Overlay type is 90% of DSH chrome. A left session rail expands after the pointer
  * stays on the rail for 150ms (`railOpen`) or while a create/rename field is
@@ -269,15 +305,16 @@ function MinimizeIcon({ size = 16 }: { size?: number }) {
  * the slab and the plugin control stays at the bottom; only the session strip
  * between them scrolls. Session rows use a terminal-window icon; the + control
  * sits immediately after the last session row inside that strip. A plugin
- * control lists overlay cards by name and unique id and can hide or unplug
- * them. The list opens in the expanded rail, directly above that control, and
- * closes when the pointer leaves it. Primary-button pointer down raises this
- * window above the overlay-card desk.
+ * control lists overlay cards and standalone overlay fibers by name and id
+ * and can hide, unplug, or switch the desktop. The list opens in the expanded rail, directly
+ * above that control, and closes when the pointer leaves it. Primary-button
+ * pointer down raises this window above the overlay-card desk.
  * @param props - locale share and overlay-stack / overlay-card inject face.
  * @returns the overlay window.
  */
 export function CursorPanel({
   t, raiseWindow, useOverlayStack, listOverlayCards, setOverlayCardHidden, setOverlayCardInserted,
+  switchOverlayDesktop,
 }: CursorPanelProps) {
   const gestureRef = useRef<OverlayGesture | null>(null)
   const railRef = useRef<HTMLElement | null>(null)
@@ -385,6 +422,15 @@ export function CursorPanel({
     )))
   }, [])
 
+  const [dshMcpBySession, setDshMcpBySession] = useState<
+    Partial<Record<OverlaySessionId, DshMcpChromeStatus>>
+  >({})
+  const onDshMcp = useCallback((sessionId: OverlaySessionId, status: DshMcpChromeStatus) => {
+    setDshMcpBySession(current => (
+      current[sessionId] === status ? current : { ...current, [sessionId]: status }
+    ))
+  }, [])
+
   const registerShutdown = useCallback((
     sessionId: OverlaySessionId,
     shutdown: () => void,
@@ -394,10 +440,7 @@ export function CursorPanel({
   }, [])
 
   useEffect(() => {
-    writePersistedRail({
-      sessions: sessions.map(row => ({ id: row.id, label: row.label })),
-      activeId,
-    })
+    persistLiveRail(sessions, activeId)
   }, [sessions, activeId])
 
   useEffect(() => {
@@ -624,6 +667,7 @@ export function CursorPanel({
   /* v8 ignore next -- closeSession retargets activeId in the same update as the list. */
   const active = found ?? sessions[0] ?? createSession(1)
   const status = active.status
+  const dshMcpStatus = dshMcpBySession[active.id] ?? 'checking'
   spriteStatusRef.current = status
   const railExpanded = railOpen
     || nameDraft !== undefined
@@ -1005,6 +1049,7 @@ export function CursorPanel({
               listOverlayCards={listOverlayCards}
               setOverlayCardHidden={setOverlayCardHidden}
               setOverlayCardInserted={setOverlayCardInserted}
+              switchOverlayDesktop={switchOverlayDesktop}
             />
           </div>
         </aside>
@@ -1017,6 +1062,13 @@ export function CursorPanel({
             onPointerUp={endGesture}
             onPointerCancel={endGesture}
           >
+            <span
+              className={css.mcpStatus}
+              data-cursor-agent-dsh-mcp=""
+              data-connected={dshMcpStatus}
+            >
+              {mcpChromeLabel(dshMcpStatus, t)}
+            </span>
             <button
               type="button"
               className={css.minimizeButton}
@@ -1039,6 +1091,7 @@ export function CursorPanel({
                 sessionId={row.id}
                 active={row.id === activeId}
                 onStatus={onStatus}
+                onDshMcp={onDshMcp}
                 registerShutdown={registerShutdown}
                 labels={chatLabels}
               />

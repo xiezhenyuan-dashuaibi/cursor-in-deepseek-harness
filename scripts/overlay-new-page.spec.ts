@@ -86,6 +86,7 @@ describe('overlay-new-page', () => {
     const pkg = JSON.parse(readFileSync(join(dest, 'package.json'), 'utf8')) as {
       name: string
       version: string
+      scripts?: Record<string, string>
       dsh: { client: { inject: string[]; overlayBody?: string } }
     }
     expect(pkg.name).toBe('@deepseek-ai/dsh-client-ui-notes')
@@ -96,6 +97,15 @@ describe('overlay-new-page', () => {
     expect(client).toContain("name: 'overlay-card.body'")
     expect(client).toContain('overlay-notes')
     expect(readFileSync(join(dest, 'src', 'client', 'Page.tsx'), 'utf8')).toContain('preferFrame(PREFERRED_FRAME)')
+    expect(readFileSync(join(dest, 'tsconfig.json'), 'utf8')).toContain('ui-float-window/tsconfig.client.json')
+    expect(pkg.scripts).toEqual({
+      build: 'tsc --pretty false -p tsconfig.json && tsdown',
+      bundle: 'tsdown',
+      watch: 'tsdown --watch',
+    })
+    expect(message).toContain('pnpm overlay:live insert packages/client/ui-float-window')
+    expect(message).not.toContain('bundle')
+    expect(readFileSync(join(dest, 'src', 'client', 'locales.ts'), 'utf8')).toContain('Keep this export name')
     expect(readFileSync(join(dest, 'tests', 'page.client.spec.tsx'), 'utf8')).toContain('PREFERRED_FRAME')
     expect(readFileSync(join(dest, 'tests', 'browser-plugin.client.spec.ts'), 'utf8')).toContain('overlay-card.body')
     expect(readFileSync(join(dest, 'README.md'), 'utf8')).toContain('## Model Experience')

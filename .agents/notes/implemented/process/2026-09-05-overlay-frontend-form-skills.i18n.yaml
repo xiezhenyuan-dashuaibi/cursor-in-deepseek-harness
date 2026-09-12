@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-05-overlay-frontend-form-skills.md
-2026-09-05-overlay-frontend-form-skills.md: c2356baf8d63505d6b1996a2f61b568ed92751e7
-2026-09-05-overlay-frontend-form-skills.zh.md: 31db3e6ca0a4cd4a5e77d27cf5514a3d2853b9f4
+2026-09-05-overlay-frontend-form-skills.md: 551cd07f81134c79e6903e4e9264037d32675924
+2026-09-05-overlay-frontend-form-skills.zh.md: c29891d5a085d70b23954ffffde1a720ca8ef0a4

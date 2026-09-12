@@ -18,8 +18,17 @@ import {
 } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import WebSocket from 'ws'
+import { CURSOR_DSH_MCP_URL_ENV } from '@deepseek-ai/dsh-cursor-mcp-server'
 import { scrubbedParentEnv } from '@deepseek-ai/dsh-subprocess'
 import { redactSecrets, type ConversationLog } from './conversation-log.ts'
+import {
+  buildMcpListArgs,
+  DSH_MCP_LIST_TIMEOUT_MS,
+  DSH_MCP_RETRY_DISCONNECTED_MS,
+  readChildOutput,
+  settleDshMcpProbe,
+  type DshMcpWireStatus,
+} from './dsh-mcp-status.ts'
 import { buildHeadlessTurnArgs } from './headless-argv.ts'
 import { buildInteractiveArgs } from './interactive-argv.ts'
 import {
@@ -76,6 +85,19 @@ export interface AgentChatRequest extends AgentArgv {
   readonly spawnChild?: SpawnInteractivePty
   /** Headless turn spawn; omitted uses `child_process.spawn`. */
   readonly spawnHeadless?: SpawnHeadlessChild
+  /**
+   * `mcp list-tools dsh` spawn for overlay `dsh` chrome. Omitted uses
+   * `child_process.spawn` in production. Tests that inject {@link spawnHeadless}
+   * skip the probe unless they pass this too, so the listing child does not
+   * collide with stream-json children.
+   */
+  readonly spawnMcpList?: SpawnHeadlessChild
+  /**
+   * Streamable HTTP MCP on this `dsh web` Host. Overlay CLI children inherit
+   * `CURSOR_DSH_MCP_URL` so `bin/stdio.mjs` attaches instead of booting
+   * `cursor-mcp`.
+   */
+  readonly mcpAttachUrl?: string
   /** Terminal columns for the interactive PTY. */
   readonly cols?: number
   /** Terminal rows for the interactive PTY. */
@@ -117,11 +139,16 @@ export function createAgentChatRuntime(
   const spawnPty = request.spawnChild ?? spawnNodePtySession
   /* v8 ignore next -- production omits spawnHeadless and uses defaultSpawn. */
   const spawnHeadless = request.spawnHeadless ?? defaultSpawn
+  const spawnMcpList = request.spawnMcpList
+    ?? (request.spawnHeadless === undefined ? defaultSpawn : undefined)
   const cols = request.cols ?? 100
   const rows = request.rows ?? 32
   const screen = new ScreenBuffer(cols, rows)
   let pty: InteractivePty | undefined
   let child: ChildProcessWithoutNullStreams | undefined
+  let mcpListChild: ChildProcessWithoutNullStreams | undefined
+  let dshMcpStatus: DshMcpWireStatus = spawnMcpList === undefined ? 'disconnected' : 'checking'
+  let mcpRetryTimer: ReturnType<typeof setTimeout> | undefined
   let closed = false
   let spawnFailed: string | undefined
   let cliReady = false
@@ -144,7 +171,7 @@ export function createAgentChatRuntime(
     const args = buildInteractiveArgs(request.args)
     pty = spawnPty(request.file, args, {
       cwd: request.cwd,
-      env: {},
+      env: overlayChildEnv(request.mcpAttachUrl),
       cols,
       rows,
     })
@@ -190,6 +217,7 @@ export function createAgentChatRuntime(
     followUps: [...pendingFollowUps],
     cursorSessionId: cursorSessionId ?? null,
     mirror: lastMirror,
+    dshMcp: dshMcpStatus,
   })
 
   const emitFollowUp = (
@@ -233,6 +261,65 @@ export function createAgentChatRuntime(
     pingTimer = undefined
   }
 
+  const stopMcpList = (): void => {
+    if (mcpRetryTimer !== undefined) {
+      clearTimeout(mcpRetryTimer)
+      mcpRetryTimer = undefined
+    }
+    if (mcpListChild === undefined) return
+    const running = mcpListChild
+    mcpListChild = undefined
+    try {
+      running.kill()
+    } catch {
+      // Probe exit races shutdown.
+    }
+  }
+
+  const publishDshMcp = (status: DshMcpWireStatus): void => {
+    if (dshMcpStatus === status) return
+    dshMcpStatus = status
+    push({ op: 'dsh_mcp', status })
+  }
+
+  const scheduleMcpRetry = (delay: number): void => {
+    if (closed || spawnMcpList === undefined) return
+    mcpRetryTimer = setTimeout(() => { void runMcpListProbe() }, delay)
+  }
+
+  const runMcpListProbe = async (): Promise<void> => {
+    if (closed || spawnMcpList === undefined) return
+    if (mcpListChild !== undefined) return
+    if (dshMcpStatus === 'disconnected') {
+      publishDshMcp('checking')
+    }
+    const listArgs = buildMcpListArgs(request.args)
+    let spawned: ChildProcessWithoutNullStreams
+    try {
+      const fenced = applySpineFence({
+        file: request.file,
+        args: listArgs,
+        cwd: request.cwd,
+        env: overlayChildEnv(request.mcpAttachUrl),
+      })
+      spawned = spawnMcpList(fenced.file, fenced.args, {
+        cwd: request.cwd,
+        env: fenced.env,
+      })
+    } catch {
+      publishDshMcp('disconnected')
+      scheduleMcpRetry(DSH_MCP_RETRY_DISCONNECTED_MS)
+      return
+    }
+    mcpListChild = spawned
+    const drain = await readChildOutput(spawned, DSH_MCP_LIST_TIMEOUT_MS)
+    if (closed || mcpListChild !== spawned) return
+    mcpListChild = undefined
+    const settled = settleDshMcpProbe(drain)
+    publishDshMcp(settled.status)
+    scheduleMcpRetry(settled.retryMs)
+  }
+
   const startPing = (socket: WebSocket): void => {
     stopPing()
     pingTimer = setInterval(() => {
@@ -256,6 +343,7 @@ export function createAgentChatRuntime(
     closed = true
     stopChild()
     stopPty()
+    stopMcpList()
     stopPing()
     const current = viewer
     viewer = undefined
@@ -366,7 +454,7 @@ export function createAgentChatRuntime(
         file: request.file,
         args: turnArgs,
         cwd: request.cwd,
-        env: scrubbedParentEnv(),
+        env: overlayChildEnv(request.mcpAttachUrl),
       })
       child = spawnHeadless(fenced.file, fenced.args, {
         cwd: request.cwd,
@@ -575,6 +663,8 @@ export function createAgentChatRuntime(
     socket.on('error', () => { detach(socket) })
   }
 
+  void runMcpListProbe()
+
   return {
     bind,
     shutdown: teardown,
@@ -711,6 +801,14 @@ function mirrorsEqual(a: PromptMirror, b: PromptMirror): boolean {
   return a.below.every((line, i) => (
     line.text === b.below[i]?.text && line.highlighted === b.below[i]?.highlighted
   ))
+}
+
+function overlayChildEnv(mcpAttachUrl: string | undefined): NodeJS.ProcessEnv {
+  const env = scrubbedParentEnv()
+  if (mcpAttachUrl !== undefined && mcpAttachUrl.length > 0) {
+    env[CURSOR_DSH_MCP_URL_ENV] = mcpAttachUrl
+  }
+  return env
 }
 
 function defaultSpawn(

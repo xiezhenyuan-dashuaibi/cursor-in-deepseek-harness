@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-31-floating-cursor-cli-overlay.md
-2026-08-31-floating-cursor-cli-overlay.md: 3d26eb5725d3bae2d10db05bda6fa2686a6d730f
-2026-08-31-floating-cursor-cli-overlay.zh.md: 2c8ed608059b52ed0da1f7359a4bc88b5c80a951
+2026-08-31-floating-cursor-cli-overlay.md: c25e982fcca3d4f6241f0319ddfb220b86216bb6
+2026-08-31-floating-cursor-cli-overlay.zh.md: 5ed3c420a1f4cc80ad9def506d55b83d92957c33

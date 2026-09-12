@@ -22,18 +22,23 @@ export const OVERLAY_CARD_SET_HIDDEN_ENDPOINT = 'instances.setHidden'
 /** Endpoint that sets Loader `disabled` on that card's occupants. */
 export const OVERLAY_CARD_SET_INSERTED_ENDPOINT = 'occupants.setInserted'
 
+/** How the rail hides or unplugs this row. */
+export type OverlayPluginKind = 'card' | 'fiber' | 'desktop'
+
 /** One overlay card as the plugin manager lists it. */
 export type OverlayCardManagerItem = {
-  /** Unique `--card-id`. */
+  /** Unique `--card-id` or standalone Loader id. */
   readonly id: string
-  /** Title-bar left name. */
+  /** Title-bar left name or `dsh.client.panelTitle`. */
   readonly title: string
-  /** `true` when the desk skipped this window. */
+  /** `true` when the desk skipped this window, or the fiber is disabled. */
   readonly hidden: boolean
   /** `false` when an occupant fiber is disabled or missing. */
   readonly inserted: boolean
   /** Loader ids on this seat; empty dims 插入/拔出. */
   readonly occupants: readonly string[]
+  /** `fiber` is a standalone overlay Loader row; `desktop` is an overlay-desktop.body occupant; omitted means `card`. */
+  readonly kind?: OverlayPluginKind
 }
 
 /** Unary RPC result the plug helper reads. */
@@ -82,6 +87,7 @@ export function overlayCardsFromListValue(value: unknown): OverlayCardManagerIte
       hidden: record.hidden === true,
       inserted: record.inserted !== false,
       occupants: Array.isArray(record.occupants) ? record.occupants as string[] : [],
+      kind: 'card',
     })
   }
   return items
@@ -193,4 +199,188 @@ export async function callOverlayCardSetInserted(
   inserted: boolean,
 ): Promise<void> {
   await callOverlayCardWrite(rpc, OVERLAY_CARD_SET_INSERTED_ENDPOINT, { id, inserted })
+}
+
+/** Connection RPC channel for standalone overlay fibers. Duplicated from the host half. */
+export const OVERLAY_PLUGIN_RPC_CHANNEL = '/overlay-plugins'
+
+/**
+ * Live recovery channel when {@link OVERLAY_PLUGIN_RPC_CHANNEL} still runs a
+ * cached Cursor `apply`. Duplicated from the host half.
+ */
+export const OVERLAY_PLUGIN_RAIL_RPC_CHANNEL = '/overlay-plugins-rail'
+
+/** Endpoint that returns `{ desktop?, plugins: OverlayCardManagerItem[] }`. */
+export const OVERLAY_PLUGIN_LIST_ENDPOINT = 'plugins.list'
+
+/** Endpoint that sets Loader `disabled` on one standalone plugin id. */
+export const OVERLAY_PLUGIN_SET_INSERTED_ENDPOINT = 'plugins.setInserted'
+
+/** Endpoint that exclusive-enables one overlay-desktop.body occupant. */
+export const OVERLAY_PLUGIN_SWITCH_DESKTOP_ENDPOINT = 'plugins.switchDesktop'
+
+/**
+ * List card windows plus standalone overlay fibers.
+ * A missing `/overlay-plugins` handler leaves the card rows in place.
+ * @param rpc - Connection generic RPC caller.
+ */
+export async function callOverlayPluginList(rpc: OverlayCardRpc): Promise<OverlayCardManagerItem[]> {
+  const cards = await callOverlayCardList(rpc)
+  const fibers = await callStandalonePluginList(rpc)
+  return [...cards, ...fibers]
+}
+
+/**
+ * Hide or show one rail row. Fiber and desktop rows have no hide file.
+ * @param rpc - Connection generic RPC caller.
+ * @param id - card id or standalone Loader id.
+ * @param hidden - `true` skips the window.
+ * @param kind - `fiber` / `desktop` reject hide.
+ */
+export async function callOverlayPluginSetHidden(
+  rpc: OverlayCardRpc,
+  id: string,
+  hidden: boolean,
+  kind: OverlayPluginKind = 'card',
+): Promise<void> {
+  if (kind === 'fiber' || kind === 'desktop') {
+    throw new Error('overlay-plugins: hide is not supported for this plugin')
+  }
+  await callOverlayCardSetHidden(rpc, id, hidden)
+}
+
+/**
+ * Insert or unplug one rail row. Desktop insert exclusive-enables that occupant.
+ * @param rpc - Connection generic RPC caller.
+ * @param id - card id or standalone Loader id.
+ * @param inserted - `false` sets Loader `disabled: true`.
+ * @param kind - `fiber` / `desktop` route to `/overlay-plugins-rail`.
+ */
+export async function callOverlayPluginSetInserted(
+  rpc: OverlayCardRpc,
+  id: string,
+  inserted: boolean,
+  kind: OverlayPluginKind = 'card',
+): Promise<void> {
+  if (kind === 'fiber' || kind === 'desktop') {
+    await callStandaloneSetInserted(rpc, id, inserted)
+    return
+  }
+  await callOverlayCardSetInserted(rpc, id, inserted)
+}
+
+/**
+ * Exclusive-enable one overlay-desktop.body occupant.
+ * @param rpc - Connection generic RPC caller.
+ * @param id - Loader id of the desktop occupant.
+ */
+export async function callOverlayPluginSwitchDesktop(
+  rpc: OverlayCardRpc,
+  id: string,
+): Promise<void> {
+  await callOverlayPluginWrite(rpc, OVERLAY_PLUGIN_SWITCH_DESKTOP_ENDPOINT, { id })
+}
+
+async function callStandalonePluginList(rpc: OverlayCardRpc): Promise<OverlayCardManagerItem[]> {
+  const rail = await listPluginChannel(rpc, OVERLAY_PLUGIN_RAIL_RPC_CHANNEL)
+  if (rail !== undefined) return rail
+  return (await listPluginChannel(rpc, OVERLAY_PLUGIN_RPC_CHANNEL)) ?? []
+}
+
+async function listPluginChannel(
+  rpc: OverlayCardRpc,
+  channel: string,
+): Promise<OverlayCardManagerItem[] | undefined> {
+  let result: OverlayCardRpcResult
+  try {
+    result = await rpc.call(channel, OVERLAY_PLUGIN_LIST_ENDPOINT, {})
+  } catch {
+    return undefined
+  }
+  if (!result.ok) return undefined
+  return overlayPluginsFromListValue(result.value)
+}
+
+async function callStandaloneSetInserted(
+  rpc: OverlayCardRpc,
+  id: string,
+  inserted: boolean,
+): Promise<void> {
+  await callOverlayPluginWrite(rpc, OVERLAY_PLUGIN_SET_INSERTED_ENDPOINT, { id, inserted })
+}
+
+async function callOverlayPluginWrite(
+  rpc: OverlayCardRpc,
+  endpoint: string,
+  payload: unknown,
+): Promise<void> {
+  let rail: OverlayCardRpcResult | undefined
+  try {
+    rail = await rpc.call(OVERLAY_PLUGIN_RAIL_RPC_CHANNEL, endpoint, payload)
+  } catch {
+    rail = undefined
+  }
+  if (rail?.ok === true) return
+  if (rail !== undefined && !isUnknownOverlayPluginEndpoint(rail.error.message)) {
+    throw new Error(rail.error.message)
+  }
+  const fallback = await rpc.call(OVERLAY_PLUGIN_RPC_CHANNEL, endpoint, payload)
+  if (!fallback.ok) throw new Error(fallback.error.message)
+}
+
+function isUnknownOverlayPluginEndpoint(message: string): boolean {
+  return message.includes('unknown overlay-plugins endpoint')
+}
+
+/**
+ * Narrow `plugins.list` JSON to rail rows. Accepts `{ desktop, plugins }` or
+ * a plugins-only payload from an older sidecar.
+ * @param value - RPC success value.
+ */
+export function overlayPluginsFromListValue(value: unknown): OverlayCardManagerItem[] | undefined {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const record = value as Record<string, unknown>
+  const items: OverlayCardManagerItem[] = []
+  const ids = new Set<string>()
+  if (record.desktop !== undefined && record.desktop !== null) {
+    const desktop = pluginItemFromUnknown(record.desktop, 'desktop')
+    if (desktop === undefined) return undefined
+    ids.add(desktop.id)
+    items.push(desktop)
+  }
+  if (!('plugins' in record) || !Array.isArray(record.plugins)) return undefined
+  for (const item of record.plugins) {
+    const parsed = pluginItemFromUnknown(item, 'fiber')
+    if (parsed === undefined) return undefined
+    if (ids.has(parsed.id)) return undefined
+    ids.add(parsed.id)
+    items.push(parsed)
+  }
+  return items
+}
+
+function pluginItemFromUnknown(
+  item: unknown,
+  fallbackKind: 'fiber' | 'desktop',
+): OverlayCardManagerItem | undefined {
+  if (item === null || typeof item !== 'object' || Array.isArray(item)) return undefined
+  const record = item as Record<string, unknown>
+  if (typeof record.id !== 'string' || record.id.length === 0) return undefined
+  if (typeof record.title !== 'string' || record.title.trim().length === 0) return undefined
+  if (record.hidden !== undefined && typeof record.hidden !== 'boolean') return undefined
+  if (record.inserted !== undefined && typeof record.inserted !== 'boolean') return undefined
+  if (record.occupants !== undefined) {
+    if (!Array.isArray(record.occupants) || record.occupants.some(id => typeof id !== 'string')) {
+      return undefined
+    }
+  }
+  const kind = record.kind === 'desktop' || record.kind === 'fiber' ? record.kind : fallbackKind
+  return {
+    id: record.id,
+    title: record.title,
+    hidden: record.hidden === true,
+    inserted: record.inserted !== false,
+    occupants: Array.isArray(record.occupants) ? record.occupants as string[] : [],
+    kind,
+  }
 }

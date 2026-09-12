@@ -26,6 +26,7 @@
     "change-scope": "tsx scripts/change-scope.ts",
     "overlay:live": "tsx scripts/overlay-live-plugin.ts",
     "overlay:new-page": "tsx scripts/overlay-new-page.ts",
+    "overlay:new-desktop": "tsx scripts/overlay-new-desktop.ts",
     "typecheck": "npm run build:lib:host && npm run typecheck:contracts-ready",
     "typecheck:contracts-ready": "tsc -b tsconfig.client.json",
     "lint": "npm run build:lib:host && npm run lint:contracts-ready",

@@ -7,7 +7,8 @@
  * with an absolute `tsx/esm` import and `cwd` set to the repo root, then
  * boots `dsh --profile cursor-mcp` with inherited stdio for MCP JSON-RPC.
  *
- * Keep stdout quiet on the success path — no logging here.
+ * If `CURSOR_DSH_MCP_URL` points at a live web Host `/cursor-mcp`, this process
+ * proxies stdio JSON-RPC there instead of booting `dsh --profile cursor-mcp`.
  */
 
 import { spawn } from 'node:child_process'
@@ -19,6 +20,15 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../..')
 const require = createRequire(join(repoRoot, 'package.json'))
 const tsxEsm = pathToFileURL(require.resolve('tsx/esm')).href
 const bin = join(repoRoot, 'apps/cli/src/bin.ts')
+const attachUrl = process.env.CURSOR_DSH_MCP_URL
+
+if (typeof attachUrl === 'string' && attachUrl.length > 0) {
+  const { waitForMcpHttp, proxyStdioToHttp } = await import('./stdio-http-proxy.mjs')
+  if (await waitForMcpHttp(attachUrl, 30_000)) {
+    await proxyStdioToHttp(attachUrl)
+    process.exit(0)
+  }
+}
 
 const child = spawn(
   process.execPath,

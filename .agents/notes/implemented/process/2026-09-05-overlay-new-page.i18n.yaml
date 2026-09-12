@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-09-05-overlay-new-page.md
-2026-09-05-overlay-new-page.md: 7b1dd834e993078469bff89d49e72b0769a350fe
-2026-09-05-overlay-new-page.zh.md: d9915d632e92cd4faee446eace7a25b6b1ce82b5
+2026-09-05-overlay-new-page.md: 582c6cc2ae96c05e531a9280640a996ccfd4d8a4
+2026-09-05-overlay-new-page.zh.md: 874b106fa7c6e2997623f3a73da4219a5f16b1b1

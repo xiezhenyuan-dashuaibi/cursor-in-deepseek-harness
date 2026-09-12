@@ -10,9 +10,9 @@ Status: implemented
 
 ## Decision
 
-`pnpm overlay:new-page <name>`（`scripts/overlay-new-page.ts`）在 `packages/client/<name>/` 写出仅前端的页面包。卡片仍然只插入。生成的 `dsh.client` 含 `overlayBody: overlay-card.body`，以便 `overlay:live insert` 能记录该座位的占用。生成器在那些 checkout 文件存在时还会写入客户端注册表行、aggregate tsconfig 路径、Model Experience 行，以及 web-app 省略名单（`scripts/overlay-page-checkout.ts`）。它不改 `packages/bundle/web-app/cordis.patch.yml`。现场出现是 `bundle` 之后的 `pnpm overlay:live`。不带 `--keep-files` 的 `pnpm overlay:live remove <id>` 是省略名单占用者的逆操作：删除该目录和那些行。Host RPC 仍是按 skill 片段改空的 `src/index.ts` `apply()`。占用者描述写在该包 README；写入器不另写一篇功能 Agent Note（[描述注册表](2026-09-05-client-plugin-description-registry.md)）。
+`pnpm overlay:new-page <name>`（`scripts/overlay-new-page.ts`）在 `packages/client/<name>/` 写出仅前端的页面包。卡片仍然只插入。生成的 `dsh.client` 含 `overlayBody: overlay-card.body`，以便 `overlay:live insert` 能记录该座位的占用。生成器在那些 checkout 文件存在时还会写入客户端注册表行、aggregate tsconfig 路径、Model Experience 行，以及 web-app 省略名单（`scripts/overlay-page-checkout.ts`）。它不改 `packages/bundle/web-app/cordis.patch.yml`。现场出现是 workspace 安装之后的 `pnpm overlay:live insert`；该命令在有 `tsdown.config.ts` 时构建 `lib/`。不带 `--keep-files` 的 `pnpm overlay:live remove <id>` 是省略名单占用者的逆操作：删除该目录和那些行。Host RPC 仍是按 skill 片段改空的 `src/index.ts` `apply()`。占用者描述写在该包 README；写入器不另写一篇功能 Agent Note（[描述注册表](2026-09-05-client-plugin-description-registry.md)）。
 
-操作 HOW：[dsh-overlay-web-plugins](../../../skills/dsh-overlay-web-plugins/SKILL.md)。卡片铬框：[overlay-card 容器](../architecture/2026-09-05-overlay-card-container.md)。现场与启动：[live path](../architecture/2026-09-04-overlay-web-plugin-live-path.md)。
+操作 HOW：[dsh-overlay-web-plugins](../../../skills/dsh-overlay-web-plugins/SKILL.md)。卡片铬框：[overlay-card 容器](../architecture/2026-09-05-overlay-card-container.md)。现场与启动：[live path](../architecture/2026-09-04-overlay-web-plugin-live-path.md)。占位出现之后的页面布局见 [画面独立](2026-09-12-overlay-occupant-visual-independence.md)。
 
 ## Alternatives considered
 
@@ -28,8 +28,8 @@ Status: implemented
 
 ## Consequences
 
-新的卡片窗口页面是：插入卡片、`overlay:new-page`、workspace 安装、只替换该包里的占位文案、bundle、对页面 `overlay:live insert`。卸载是 `overlay:live remove <id>`，并删除该省略名单 checkout 包。加入默认 web-app 名录是本次 overlay 会话结束之后再改 bundle patch。那次落地在 overlay Cursor 运行时不改 `packages/bundle/web-app/cordis.patch.yml`。
+新的卡片窗口页面是：插入卡片、`overlay:new-page`、workspace 安装、只替换该包里的占位文案、对页面 `overlay:live insert`。替换占位不包括去搜索、grep 或打开兄弟占用者的页面前端，除非用户明确要求做一个与那个产品类似的东西。卸载是 `overlay:live remove <id>`，并删除该省略名单 checkout 包。加入默认 web-app 名录是本次 overlay 会话结束之后再改 bundle patch。那次落地在 overlay Cursor 运行时不改 `packages/bundle/web-app/cordis.patch.yml`。
 
 ## Testing
 
-`scripts/overlay-new-page.spec.ts` 固定 kebab / `packages/client/` 名称、`dsh.client.inject` 含 `ui-float-window`、`dsh.client.overlayBody` 为 `overlay-card.body`、`overlay-card.body` 注册源、目标已存在、根 package.json 缺 version、web-app `cordis.patch.yml` 不被改写，以及那些 checkout 文件存在时的落地行。`scripts/overlay-page-checkout.spec.ts` 固定卸载和前缀安全的兄弟包名。已知缺口：不会在临时树里跑生成包的测试（workspace 的 `react` 链接在 `packages/client/` 下）。
+`scripts/overlay-new-page.spec.ts` 固定 kebab / `packages/client/` 名称、`dsh.client.inject` 含 `ui-float-window`、`dsh.client.overlayBody` 为 `overlay-card.body`、`overlay-card.body` 注册源、`../ui-float-window/tsconfig.client.json`、`scripts.build`、Next 步骤先插入卡片、目标已存在、根 package.json 缺 version、web-app `cordis.patch.yml` 不被改写，以及那些 checkout 文件存在时的落地行。`scripts/overlay-page-checkout.spec.ts` 固定卸载和前缀安全的兄弟包名。已知缺口：不会在临时树里跑生成包的测试（workspace 的 `react` 链接在 `packages/client/` 下）。

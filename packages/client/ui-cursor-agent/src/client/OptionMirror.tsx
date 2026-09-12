@@ -38,14 +38,17 @@ export function OptionMirror({ lines, onKeyDown, onCommitText }: OptionMirrorPro
   const imeRef = useRef<HTMLInputElement>(null)
   const [composing, setComposing] = useState(false)
   const display = useMemo(() => trimBlankEdges(lines), [lines])
-  const highlight = display.findIndex(line => line.highlighted)
+  const painted = display.findIndex(line => line.highlighted)
+  const activeAt = painted >= 0
+    ? painted
+    : display.findIndex(line => isGlyphCursorRow(line.text))
 
   useEffect(() => {
-    const active = listRef.current?.querySelector('[data-active]')
-    if (active instanceof HTMLElement && typeof active.scrollIntoView === 'function') {
-      active.scrollIntoView({ block: 'nearest' })
-    }
-  }, [highlight, display])
+    const scroller = listRef.current
+    if (scroller === null) return
+    const active = scroller.querySelector('[data-active]')
+    if (active instanceof HTMLElement) scrollRowIntoScroller(scroller, active)
+  }, [activeAt, display])
 
   if (display.length === 0) return null
 
@@ -78,7 +81,7 @@ export function OptionMirror({ lines, onKeyDown, onCommitText }: OptionMirrorPro
             key={String(index)}
             className={css.cliBelowRow}
             data-cursor-agent-mirror-line=""
-            data-active={line.highlighted || undefined}
+            data-active={index === activeAt || undefined}
             data-empty={empty || undefined}
           >
             {empty ? '\u00a0' : densifyMirrorText(line.text)}
@@ -108,6 +111,18 @@ export function OptionMirror({ lines, onKeyDown, onCommitText }: OptionMirrorPro
   )
 }
 
+/**
+ * True when this below-prompt row is the CLI's selected option.
+ * Host reverse-video sets `highlighted`. Slash menus also paint a leading
+ * `→` or `▸` without reverse-video. Pager chrome (`↑` / `↓`) is not a
+ * selection.
+ * @param line - one `{op:"mirror"}.below` row.
+ * @returns true when this row is the current option.
+ */
+export function isMirrorCursorRow(line: OptionMirrorLine): boolean {
+  return line.highlighted || isGlyphCursorRow(line.text)
+}
+
 /** Drop leading and trailing blank PTY padding rows. */
 export function trimBlankEdges(
   lines: readonly OptionMirrorLine[],
@@ -129,6 +144,31 @@ export function trimBlankEdges(
 
 function isBlankMirrorRow(text: string): boolean {
   return text.trim().length === 0
+}
+
+/** Leading `→` / `▸` on a slash option; not pager `↑ more above` / `↓ more below`. */
+function isGlyphCursorRow(text: string): boolean {
+  const trimmed = text.trimStart()
+  if (trimmed.startsWith('↓') || trimmed.startsWith('↑')) return false
+  return trimmed.startsWith('→') || trimmed.startsWith('▸')
+}
+
+/**
+ * Scroll `row` inside `scroller` only. `scrollIntoView` would also move
+ * ancestor overlay scrollers and hide the composer dock.
+ * @param scroller - the glass card (`.cliBelow`).
+ * @param row - the selected option row.
+ */
+function scrollRowIntoScroller(scroller: HTMLElement, row: HTMLElement): void {
+  const scrollerBox = scroller.getBoundingClientRect()
+  const rowBox = row.getBoundingClientRect()
+  if (rowBox.bottom > scrollerBox.bottom) {
+    scroller.scrollTop += rowBox.bottom - scrollerBox.bottom
+    return
+  }
+  if (rowBox.top < scrollerBox.top) {
+    scroller.scrollTop -= scrollerBox.top - rowBox.top
+  }
 }
 
 /** Collapse wide Ink column gaps so the glass card stays dense. */

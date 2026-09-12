@@ -17,6 +17,10 @@
  * retried on the next flush so a package that appears on disk after the
  * first miss can still join the graph. Bundle content changes reach the
  * graph only through {@link ClientModuleRegistry.rebuilt}.
+ * `dsh.client.overlayBody` is optional metadata for the plugin rail and
+ * `overlay:live` exclusive insert. An unknown string value does not fail
+ * composition: the Node half of this process is the first import for the
+ * process lifetime, and a newer slot name must still join {@link WebBootGraph}.
  * @module @deepseek-ai/dsh-client-modules
  */
 
@@ -49,12 +53,12 @@ interface DshClientDeclaration {
   platform: string
   /** Boot phase-one prefetch mark; absent means lazy (fetched on demand). */
   immediately?: boolean
-  /** Overlay-card body slot this page occupies; absent means not a card page. */
+  /** Overlay body slot this page occupies when the string is a known card or desktop slot. */
   overlayBody?: string
 }
 
-/** `overlay-card.body` or `overlay-card-N.body` for N in 2..8. */
-const OVERLAY_CARD_BODY_SLOT = /^overlay-card(?:-[2-8])?\.body$/
+/** `overlay-card.body`, `overlay-card-N.body` for N ≥ 2, or `overlay-desktop.body`. */
+const OVERLAY_BODY_SLOT = /^(overlay-card(?:-(?:[2-9]|[1-9]\d+))?\.body|overlay-desktop\.body)$/
 
 /** Resolved package metadata for one `dsh.client` package (cached per name, never expires). */
 interface PkgMeta {
@@ -110,7 +114,16 @@ interface WebPluginRecord {
   clientPath: string
 }
 
-/** Narrow an unknown parsed JSON value to the `dsh.client` declaration, throwing on malformed fields. */
+/**
+ * Narrow an unknown parsed JSON value to the `dsh.client` declaration.
+ * Boot-graph admission is `platform: 'web'` plus `exports["./client"]`.
+ * A recognized `overlayBody` is recorded; an unknown string is ignored so a
+ * newer slot name on an older scanner still joins the graph. A non-string
+ * `overlayBody` is malformed and throws.
+ * @param pkgName - npm package name used in errors.
+ * @param value - `package.json` `dsh.client` value.
+ * @returns the declaration, or `undefined` when `dsh.client` is absent.
+ */
 function parseDshClient(pkgName: string, value: unknown): DshClientDeclaration | undefined {
   if (value === undefined) return undefined
   if (typeof value !== 'object' || value === null) {
@@ -126,18 +139,18 @@ function parseDshClient(pkgName: string, value: unknown): DshClientDeclaration |
   if (decl.immediately !== undefined && typeof decl.immediately !== 'boolean') {
     throw new Error(`client-modules: ${pkgName} dsh.client.immediately must be a boolean`)
   }
+  let overlayBody: string | undefined
   if (decl.overlayBody !== undefined) {
-    if (typeof decl.overlayBody !== 'string' || !OVERLAY_CARD_BODY_SLOT.test(decl.overlayBody)) {
-      throw new Error(
-        `client-modules: ${pkgName} dsh.client.overlayBody must be overlay-card.body or overlay-card-N.body for N in 2..8`,
-      )
+    if (typeof decl.overlayBody !== 'string') {
+      throw new Error(`client-modules: ${pkgName} dsh.client.overlayBody must be a string`)
     }
+    if (OVERLAY_BODY_SLOT.test(decl.overlayBody)) overlayBody = decl.overlayBody
   }
   return {
     platform: decl.platform,
     ...(decl.inject !== undefined ? { inject: decl.inject as string[] } : {}),
     ...(decl.immediately !== undefined ? { immediately: decl.immediately } : {}),
-    ...(typeof decl.overlayBody === 'string' ? { overlayBody: decl.overlayBody } : {}),
+    ...(overlayBody !== undefined ? { overlayBody } : {}),
   }
 }
 

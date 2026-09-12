@@ -28,14 +28,14 @@ export const OVERLAY_CARD_SET_INSERTED_ENDPOINT = 'occupants.setInserted'
 /** File name next to the live plugin `lib/` copy. Checkout keeps a one-card template; runtime reads the profile copy. */
 export const OVERLAY_CARD_INSTANCES_FILE = 'instances.json'
 
-/** Highest seat the desk predeclares slots for. */
-export const OVERLAY_CARD_MAX = 8
+/**
+ * Fewest body slots OverlayDesk predeclares. Adding a card inside this block
+ * does not remount the desk. Crossing it doubles the table (8, 16, 32, …).
+ */
+export const OVERLAY_CARD_SEAT_BLOCK = 8
 
-/** Seats the desk may mount. */
-export const OVERLAY_CARD_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8] as const
-
-/** One allowed seat. */
-export type OverlayCardNumber = (typeof OVERLAY_CARD_NUMBERS)[number]
+/** Positive integer seat. Seat 1 is `overlay-card.body`; N ≥ 2 is `overlay-card-N.body`. */
+export type OverlayCardNumber = number
 
 /** Default title-bar name when `--title` is omitted. */
 export const OVERLAY_CARD_DEFAULT_TITLE = '卡片'
@@ -51,34 +51,33 @@ const CARD_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/
 
 /**
  * Loader ids the hide/unplug RPC must not disable. Desk, Cursor panel, and
- * overlay-card host sidecars stay mounted.
+ * overlay host sidecars stay mounted.
  */
 const PROTECTED_LOADER_IDS: ReadonlySet<string> = new Set([
   'ui-float-window',
+  'ui-overlay-desktop',
   'ui-cursor-agent',
   'cursor-agent',
   'overlay-card-roster-rpc',
   'overlay-card-plug-rpc',
   'overlay-card-hide-rpc',
   'overlay-card-rpc',
+  'overlay-plugin-roster-rpc',
+  'overlay-plugin-rail-rpc',
 ])
 
 /** Body slot for seat 1, or `overlay-card-N.body` for N greater than 1. */
-export type OverlayCardBodySlot<N extends OverlayCardNumber = OverlayCardNumber> = N extends 1
-  ? 'overlay-card.body'
-  : `overlay-card-${N}.body`
+export type OverlayCardBodySlot = 'overlay-card.body' | `overlay-card-${number}.body`
 
 /** Trailing chrome slot for seat 1, or `overlay-card-N.chrome.trailing` otherwise. */
-export type OverlayCardTrailingSlot<N extends OverlayCardNumber = OverlayCardNumber> = N extends 1
-  ? 'overlay-card.chrome.trailing'
-  : `overlay-card-${N}.chrome.trailing`
+export type OverlayCardTrailingSlot = 'overlay-card.chrome.trailing' | `overlay-card-${number}.chrome.trailing`
 
 /** Union of every body and trailing slot the desk declares. */
 export type OverlayCardChildSlot = OverlayCardBodySlot | OverlayCardTrailingSlot
 
 /** One mounted card as stored in `instances.json` and returned by `instances.list`. */
 export interface OverlayCardSpec {
-  /** Slot seat 1..8 (`overlay-card.body` is seat 1). */
+  /** Slot seat (`overlay-card.body` is seat 1; later seats are `overlay-card-N.body`). */
   readonly seat: OverlayCardNumber
   /** Unique card id shown in chrome and used by `overlay:live remove overlay-card-<id>`. */
   readonly id: string
@@ -129,7 +128,38 @@ export interface OverlayCardRoster {
  * @param n - candidate.
  */
 export function isOverlayCardNumber(n: number): n is OverlayCardNumber {
-  return Number.isInteger(n) && n >= 1 && n <= OVERLAY_CARD_MAX
+  return Number.isSafeInteger(n) && n >= 1
+}
+
+/**
+ * Highest seat in a roster. Empty list is 0.
+ * @param cards - loaded specs.
+ * @returns the highest `seat`, or 0 when `cards` is empty.
+ */
+export function overlayCardRosterMaxSeat(cards: readonly OverlayCardSpec[]): number {
+  let maxSeat = 0
+  for (const card of cards) {
+    if (card.seat > maxSeat) maxSeat = card.seat
+  }
+  return maxSeat
+}
+
+/**
+ * How many numbered seats OverlayDesk predeclares for this roster high-water
+ * mark. At least {@link OVERLAY_CARD_SEAT_BLOCK}, then the next power of two
+ * that covers `maxSeat`.
+ * @param maxSeat - highest seat on the roster (0 when empty).
+ * @returns the predeclared seat count (at least 8).
+ */
+export function overlayCardDeclaredSeatCount(maxSeat: number): number {
+  const need = Math.max(maxSeat, 1)
+  let n = OVERLAY_CARD_SEAT_BLOCK
+  while (n < need) {
+    const next = n * 2
+    if (!Number.isSafeInteger(next)) return need
+    n = next
+  }
+  return n
 }
 
 /**
@@ -164,36 +194,37 @@ export function parseOverlayCardInstanceId(token: string): string | undefined {
 /**
  * Body slot occupied by the page on seat `n`.
  * @param n - seat.
- * @throws when `n` is outside 1..{@link OVERLAY_CARD_MAX}.
+ * @throws when `n` is not a positive integer.
  */
 export function overlayCardBodySlot(n: number): OverlayCardBodySlot {
   if (!isOverlayCardNumber(n)) {
-    throw new Error(`overlay-card: card number must be 1..${String(OVERLAY_CARD_MAX)}`)
+    throw new Error('overlay-card: card number must be a positive integer')
   }
   return (n === 1 ? 'overlay-card.body' : `overlay-card-${String(n)}.body`) as OverlayCardBodySlot
 }
 
 /**
  * Seat for a body slot string from `dsh.client.overlayBody`.
- * @param slot - `overlay-card.body` or `overlay-card-N.body`.
+ * @param slot - `overlay-card.body` or `overlay-card-N.body` for N ≥ 2.
  * @returns the seat, or `undefined` when the string is not a body slot.
  */
 export function overlayCardSeatFromBodySlot(slot: string): OverlayCardNumber | undefined {
   if (slot === 'overlay-card.body') return 1
-  const match = /^overlay-card-([2-8])\.body$/.exec(slot)
+  const match = /^overlay-card-([1-9]\d*)\.body$/.exec(slot)
   if (match === null) return undefined
   const n = Number(match[1])
-  return isOverlayCardNumber(n) ? n : undefined
+  if (n === 1 || !isOverlayCardNumber(n)) return undefined
+  return n
 }
 
 /**
  * Trailing chrome slot on seat `n`.
  * @param n - seat.
- * @throws when `n` is outside 1..{@link OVERLAY_CARD_MAX}.
+ * @throws when `n` is not a positive integer.
  */
 export function overlayCardTrailingSlot(n: number): OverlayCardTrailingSlot {
   if (!isOverlayCardNumber(n)) {
-    throw new Error(`overlay-card: card number must be 1..${String(OVERLAY_CARD_MAX)}`)
+    throw new Error('overlay-card: card number must be a positive integer')
   }
   return (
     n === 1 ? 'overlay-card.chrome.trailing' : `overlay-card-${String(n)}.chrome.trailing`
@@ -313,7 +344,7 @@ export function formatOverlayCardInstances(cards: readonly OverlayCardSpec[]): s
  * Append one card using insert-time overrides (or defaults).
  * @param cards - loaded specs.
  * @param request - `--title` / `--card-id` / `--width` / `--height`.
- * @throws when the desk is full, the id is duplicate or invalid, or size is not a positive integer.
+ * @throws when the id is duplicate or invalid, size is not a positive integer, or the next seat is not a safe integer.
  */
 export function appendOverlayCard(
   cards: readonly OverlayCardSpec[],
@@ -360,18 +391,11 @@ export function resolveOverlayCardInsert(
   cards: readonly OverlayCardSpec[],
   request: OverlayCardInsertRequest = {},
 ): OverlayCardSpec {
-  if (cards.length >= OVERLAY_CARD_MAX) {
-    throw new Error(`overlay-card: at most ${String(OVERLAY_CARD_MAX)} cards`)
-  }
-  let maxSeat = 0
   const ids = new Set<string>()
-  for (const card of cards) {
-    ids.add(card.id)
-    if (card.seat > maxSeat) maxSeat = card.seat
-  }
-  const nextSeat = maxSeat + 1
+  for (const card of cards) ids.add(card.id)
+  const nextSeat = overlayCardRosterMaxSeat(cards) + 1
   if (!isOverlayCardNumber(nextSeat)) {
-    throw new Error(`overlay-card: at most ${String(OVERLAY_CARD_MAX)} cards`)
+    throw new Error('overlay-card: seat overflow')
   }
   const id = request.id ?? String(nextSeat)
   if (!isOverlayCardId(id)) {

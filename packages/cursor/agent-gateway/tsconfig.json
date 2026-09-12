@@ -18,6 +18,9 @@
       "path": "../../client/connection/tsconfig.host.json"
     },
     {
+      "path": "../mcp-server"
+    },
+    {
       "path": "../../host/webserver"
     },
     {

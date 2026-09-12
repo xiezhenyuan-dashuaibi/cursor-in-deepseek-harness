@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-06-overlay-playable-board.md
-2026-09-06-overlay-playable-board.md: 81eba14ce2d1e306c957927da90e37418f7df8b4
-2026-09-06-overlay-playable-board.zh.md: 50d796b4ab58f5286e8415a1cac3692a7d1f2d19
+2026-09-06-overlay-playable-board.md: 2a6bb7ce662e0ce9a265210b26de5fc028cdb29a
+2026-09-06-overlay-playable-board.zh.md: cb70c5fcd6d78dc47beb07b1afe9530258e4f0c8

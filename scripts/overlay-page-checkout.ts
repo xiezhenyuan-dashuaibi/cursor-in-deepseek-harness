@@ -18,6 +18,12 @@ export interface OverlayPageIdentity {
 /** Canonical card module: live remove unloads the desk, not this checkout tree. */
 export const OVERLAY_CARD_DIR = 'ui-float-window'
 
+/** Canonical desktop board: live remove unloads the board, not this checkout tree. */
+export const OVERLAY_DESKTOP_DIR = 'ui-overlay-desktop'
+
+/** Occupant form that chooses inventory and tsconfig landing markers. */
+export type OverlayCheckoutForm = 'card' | 'desktop'
+
 const LANDING_FILES = {
   clientTsconfig: 'tsconfig.client.json',
   baseTsconfig: 'tsconfig.base.json',
@@ -35,8 +41,17 @@ const LANDING_FILES = {
  * rows when those checkout files exist. Never writes the web-app bundle patch.
  * @param repoRoot - repository root.
  * @param name - parsed page identity.
+ * @param form - card body vs desktop body landing markers.
  */
-export function landCheckoutSurfaces(repoRoot: string, name: OverlayPageIdentity): void {
+export function landCheckoutSurfaces(
+  repoRoot: string,
+  name: OverlayPageIdentity,
+  form: OverlayCheckoutForm = 'card',
+): void {
+  if (form === 'desktop') {
+    landDesktopCheckoutSurfaces(repoRoot, name)
+    return
+  }
   insertAfterMarker(
     join(repoRoot, LANDING_FILES.clientTsconfig),
     '{ "path": "./packages/client/ui-float-window/tsconfig.client.json" },',
@@ -65,6 +80,51 @@ export function landCheckoutSurfaces(repoRoot: string, name: OverlayPageIdentity
     join(repoRoot, LANDING_FILES.modelExperience),
     "'packages/client/ui-float-window': { kind: 'none', reason: 'Reusable overlay card desk; registers nothing model-facing.' },",
     `  'packages/client/${name.dirName}': { kind: 'none', reason: 'Browser-only overlay-card.body occupant; registers nothing model-facing.' },`,
+    `'packages/client/${name.dirName}'`,
+  )
+  prependInFile(
+    join(repoRoot, LANDING_FILES.omitList),
+    'const OMITTED_IDS = [',
+    `const OMITTED_IDS = ['${name.dirName}', `,
+    `'${name.dirName}'`,
+  )
+  prependInFile(
+    join(repoRoot, LANDING_FILES.omitList),
+    'const OMITTED_PACKAGES = [',
+    `const OMITTED_PACKAGES = [\n  '${name.npmName}',`,
+    name.npmName,
+  )
+}
+
+function landDesktopCheckoutSurfaces(repoRoot: string, name: OverlayPageIdentity): void {
+  insertAfterMarker(
+    join(repoRoot, LANDING_FILES.clientTsconfig),
+    '{ "path": "./packages/client/ui-overlay-desktop/tsconfig.client.json" },',
+    `    { "path": "./packages/client/${name.dirName}" },`,
+    `./packages/client/${name.dirName}`,
+  )
+  insertAfterMarker(
+    join(repoRoot, LANDING_FILES.baseTsconfig),
+    '"@deepseek-ai/dsh-client-ui-overlay-desktop": ["./packages/client/ui-overlay-desktop/src"],',
+    `      "${name.npmName}": ["./packages/client/${name.dirName}/src"],`,
+    name.npmName,
+  )
+  insertAfterMarker(
+    join(repoRoot, LANDING_FILES.inventoryEn),
+    '| [`ui-overlay-desktop/`](ui-overlay-desktop/README.md) | Canonical reusable overlay desktop board on `shell.overlay`; insert this package, then occupy `overlay-desktop.body` (one occupant at a time). |',
+    `| [\`${name.dirName}/\`](${name.dirName}/README.md) | Occupant of \`overlay-desktop.body\`. Not in the default web-app roster. |`,
+    `[\`${name.dirName}/\`](${name.dirName}/README.md)`,
+  )
+  insertAfterMarker(
+    join(repoRoot, LANDING_FILES.inventoryZh),
+    '| [`ui-overlay-desktop/`](ui-overlay-desktop/README.md) | 规范的可复用 overlay 桌面基模，占据 `shell.overlay`；插入本包后再占据 `overlay-desktop.body`（同时只能一个占用者）。 |',
+    `| [\`${name.dirName}/\`](${name.dirName}/README.md) | \`overlay-desktop.body\` 的占用者。默认 web-app 名录不挂载。 |`,
+    `[\`${name.dirName}/\`](${name.dirName}/README.md)`,
+  )
+  insertAfterMarker(
+    join(repoRoot, LANDING_FILES.modelExperience),
+    "'packages/client/ui-overlay-desktop': { kind: 'none', reason: 'Reusable overlay desktop board; registers nothing model-facing.' },",
+    `  'packages/client/${name.dirName}': { kind: 'none', reason: 'Browser-only overlay-desktop.body occupant; registers nothing model-facing.' },`,
     `'packages/client/${name.dirName}'`,
   )
   prependInFile(
@@ -126,6 +186,7 @@ export function purgeCheckoutOccupant(repoRoot: string, dirName: string): boolea
  */
 export function isLabOverlayOccupant(repoRoot: string, dirName: string): boolean {
   if (dirName === OVERLAY_CARD_DIR) return false
+  if (dirName === OVERLAY_DESKTOP_DIR) return false
   if (isWebAppRosterPackage(repoRoot, dirName)) return false
   const dest = join(repoRoot, 'packages', 'client', dirName)
   if (!existsSync(dest)) return false

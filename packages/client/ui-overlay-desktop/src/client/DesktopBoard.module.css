@@ -1,0 +1,21 @@
+/* Full-size click-through board. The shell layer leaves `[data-overlay-board]`
+   alone so empty space does not steal hits from sibling overlay occupants.
+   A body occupant may set pointer-events on its own root. */
+.board {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.empty {
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-l-strong-18);
+}

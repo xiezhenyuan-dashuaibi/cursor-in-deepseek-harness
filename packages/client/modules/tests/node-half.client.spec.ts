@@ -181,13 +181,47 @@ describe('client bundle activation', () => {
     await ctx.fiber.dispose()
   })
 
-  it('rejects an invalid dsh.client.overlayBody', () => {
-    const packageName = '@fixture/bad-overlay-body'
+  it('joins the boot graph when overlayBody is an unknown string', () => {
+    const packageName = '@fixture/unknown-overlay-body'
     const clientPath = writePackage(packageName, {
       dsh: { client: { platform: 'web', overlayBody: 'root' } },
     })
     mkdirSync(dirname(clientPath), { recursive: true })
     writeFileSync(clientPath, 'module.exports = {}\n')
-    expect(() => construct([packageName])).toThrow(/overlayBody must be overlay-card.body/)
+    expect(construct([packageName]).graph().entries.map(entry => entry.id)).toEqual([packageName])
+    const desktopPath = writePackage('@fixture/desktop-overlay-body', {
+      dsh: { client: { platform: 'web', overlayBody: 'overlay-desktop.body' } },
+    })
+    mkdirSync(dirname(desktopPath), { recursive: true })
+    writeFileSync(desktopPath, 'module.exports = {}\n')
+    expect(construct(['@fixture/desktop-overlay-body']).graph().entries.map(entry => entry.id)).toEqual([
+      '@fixture/desktop-overlay-body',
+    ])
+    const numberedPath = writePackage('@fixture/numbered-overlay-body', {
+      dsh: { client: { platform: 'web', overlayBody: 'overlay-card-10.body' } },
+    })
+    mkdirSync(dirname(numberedPath), { recursive: true })
+    writeFileSync(numberedPath, 'module.exports = {}\n')
+    expect(construct(['@fixture/numbered-overlay-body']).graph().entries.map(entry => entry.id)).toEqual([
+      '@fixture/numbered-overlay-body',
+    ])
+    const seatOnePath = writePackage('@fixture/seat-one-numbered-overlay-body', {
+      dsh: { client: { platform: 'web', overlayBody: 'overlay-card-1.body' } },
+    })
+    mkdirSync(dirname(seatOnePath), { recursive: true })
+    writeFileSync(seatOnePath, 'module.exports = {}\n')
+    expect(construct(['@fixture/seat-one-numbered-overlay-body']).graph().entries.map(entry => entry.id)).toEqual([
+      '@fixture/seat-one-numbered-overlay-body',
+    ])
+  })
+
+  it('rejects a non-string dsh.client.overlayBody', () => {
+    const packageName = '@fixture/numeric-overlay-body'
+    const clientPath = writePackage(packageName, {
+      dsh: { client: { platform: 'web', overlayBody: 1 } },
+    })
+    mkdirSync(dirname(clientPath), { recursive: true })
+    writeFileSync(clientPath, 'module.exports = {}\n')
+    expect(() => construct([packageName])).toThrow(/overlayBody must be a string/)
   })
 })

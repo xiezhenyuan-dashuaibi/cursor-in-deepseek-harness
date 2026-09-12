@@ -1,12 +1,9 @@
-/**
- * Cursor project hook: deny Agent writes under the DSH spine.
- * DSH file sandbox does not fence Cursor's own Write/StrReplace/Shell tools.
- * Policy home: .agents/notes/implemented/process/2026-09-01-cursor-spine-write-deny.md
- */
-import { isAbsolute, relative, resolve, sep } from 'node:path'
-import { pathToFileURL } from 'node:url'
 
-/** Repo-relative posix prefixes (and the hooks file) Agent writes must not hit. */
+import { existsSync, writeFileSync } from 'node:fs'
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+/** Repo-relative posix prefixes the Agent must not write. */
 export const PROTECTED_PREFIXES = Object.freeze([
   'vendor/',
   'packages/core/',
@@ -16,27 +13,35 @@ export const PROTECTED_PREFIXES = Object.freeze([
 ])
 
 /** Exact repo-relative posix files protected in addition to the prefixes. */
-export const PROTECTED_FILES = Object.freeze(['.cursor/hooks.json'])
+export const PROTECTED_FILES = Object.freeze([
+  '.cursor/hooks.json',
+])
+
+/** Cursor tool names that mutate files. Other tools with a path are reads. */
+const WRITE_TOOLS = new Set([
+  'Write',
+  'StrReplace',
+  'Delete',
+  'EditNotebook',
+  'ApplyPatch',
+])
 
 const PATH_KEYS = new Set([
   'path',
   'file_path',
   'filePath',
+  'file',
+  'target_file',
+  'target_path',
   'target_notebook',
   'targetFile',
   'old_path',
   'new_path',
+  'target_directory',
+  'working_directory',
 ])
 
-const WRITE_TOOLS = new Set([
-  'write',
-  'strreplace',
-  'delete',
-  'editnotebook',
-  'tabwrite',
-])
-
-const READ_TOOLS = new Set(['read', 'grep', 'glob', 'semanticsearch', 'tabread'])
+const PATH_ARRAY_KEYS = new Set(['paths', 'file_attachments', 'target_directories'])
 
 const MUTATION = new RegExp(
   [
@@ -47,7 +52,34 @@ const MUTATION = new RegExp(
   'i',
 )
 
-const TEST_OR_BUILD = /\b(?:pnpm|npm|npx|vitest|tsc|tsdown|oxlint|knip)\b/
+/**
+ * Walk up from this file until `.cursor/hooks.json` is a child of the directory.
+ * Works both as `.cursor/hooks/protect-spine.mjs` and `.cursor/protect-spine.proposed.mjs`.
+ * @param {string} start
+ * @returns {string}
+ */
+function findRepoRoot(start) {
+  let dir = start
+  for (let i = 0; i < 6; i++) {
+    if (existsSync(resolve(dir, '.cursor', 'hooks.json'))) return dir
+    const parent = resolve(dir, '..')
+    if (parent === dir) break
+    dir = parent
+  }
+  return resolve(start, '..', '..')
+}
+
+export const REPO_ROOT_FROM_HOOK = findRepoRoot(dirname(fileURLToPath(import.meta.url)))
+
+/**
+ * pnpm workspace install writes `node_modules` under protected packages.
+ * Those trees are install artifacts, not spine source.
+ * @param {string} posix
+ * @returns {boolean}
+ */
+function isInstallArtifactRelative(posix) {
+  return posix.split('/').includes('node_modules')
+}
 
 /**
  * @param {string} rel
@@ -55,6 +87,7 @@ const TEST_OR_BUILD = /\b(?:pnpm|npm|npx|vitest|tsc|tsdown|oxlint|knip)\b/
  */
 export function isProtectedRelative(rel) {
   const posix = rel.replaceAll('\\', '/').replace(/^\.\/+/, '')
+  if (isInstallArtifactRelative(posix)) return false
   if (PROTECTED_FILES.includes(posix)) return true
   return PROTECTED_PREFIXES.some(
     prefix => posix === prefix.slice(0, -1) || posix.startsWith(prefix),
@@ -69,10 +102,42 @@ export function isProtectedRelative(rel) {
 export function toRepoRelative(raw, repoRoot) {
   const trimmed = raw.trim().replace(/^['"]|['"]$/g, '')
   if (trimmed.length === 0) return undefined
+  const posix = trimmed.replaceAll('\\', '/')
   const absolute = isAbsolute(trimmed) ? trimmed : resolve(repoRoot, trimmed)
   const rel = relative(repoRoot, absolute)
-  if (rel.startsWith(`..${sep}`) || rel === '..') return undefined
-  return rel.replaceAll('\\', '/')
+  if (!(rel.startsWith(`..${sep}`) || rel === '..')) {
+    return rel.replaceAll('\\', '/')
+  }
+  // Cursor hook stdin may mojibake non-ASCII workspace prefixes.
+  const repoName = repoRoot.replaceAll('\\', '/').split('/').filter(Boolean).at(-1)
+  if (repoName === undefined) return undefined
+  const needle = `/${repoName}/`
+  const idx = posix.toLowerCase().lastIndexOf(needle.toLowerCase())
+  if (idx !== -1) return posix.slice(idx + needle.length)
+  return undefined
+}
+
+/**
+ * Cursor may send `tool_input` as an object or a JSON string.
+ * @param {unknown} raw
+ * @returns {Record<string, unknown>}
+ */
+export function coerceRecord(raw) {
+  if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) return raw
+  if (typeof raw === 'string') {
+    const text = raw.trim()
+    if (text.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(text)
+        if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          return parsed
+        }
+      } catch {
+        return {}
+      }
+    }
+  }
+  return {}
 }
 
 /**
@@ -88,6 +153,11 @@ function collectPathStrings(value, out) {
   if (value === null || typeof value !== 'object') return
   for (const [key, child] of Object.entries(value)) {
     if (PATH_KEYS.has(key) && typeof child === 'string') out.push(child)
+    if (PATH_ARRAY_KEYS.has(key) && Array.isArray(child)) {
+      for (const item of child) {
+        if (typeof item === 'string') out.push(item)
+      }
+    }
     collectPathStrings(child, out)
   }
 }
@@ -100,10 +170,8 @@ export function pathTokensFromCommand(command) {
   const tokens = []
   const quoted = command.matchAll(/['"]([^'"]+)['"]/g)
   for (const match of quoted) tokens.push(match[1] ?? '')
-  for (const token of command.split(/[\s;&|<>]+/)) {
-    if (token.includes('/') || token.includes('\\') || token.includes('packages') || token.includes('vendor')) {
-      tokens.push(token)
-    }
+  for (const token of command.split(/[\s;&|<>]+/g)) {
+    if (token.includes('/') || token.includes('\\')) tokens.push(token)
   }
   return tokens.filter(token => token.length > 0)
 }
@@ -117,22 +185,23 @@ export function commandLooksLikeMutation(command) {
 }
 
 /**
+ * @param {unknown} name
+ * @returns {boolean}
+ */
+export function isWriteTool(name) {
+  return typeof name === 'string' && WRITE_TOOLS.has(name)
+}
+
+/**
  * @param {Record<string, unknown>} input
  * @param {string} repoRoot
  * @returns {{ permission: 'allow' | 'deny', user_message?: string, agent_message?: string }}
  */
 export function decide(input, repoRoot) {
-  const toolName = typeof input.tool_name === 'string' ? input.tool_name.toLowerCase() : ''
+  const toolInput = coerceRecord(input.tool_input ?? input.arguments)
   const topCommand = typeof input.command === 'string' ? input.command : undefined
-  const toolInput = input.tool_input !== null && typeof input.tool_input === 'object'
-    ? input.tool_input
-    : {}
   const nestedCommand = typeof toolInput.command === 'string' ? toolInput.command : undefined
   const command = topCommand ?? nestedCommand
-
-  if (READ_TOOLS.has(toolName) && command === undefined) {
-    return { permission: 'allow' }
-  }
 
   const paths = []
   if (typeof input.file_path === 'string') paths.push(input.file_path)
@@ -145,22 +214,17 @@ export function decide(input, repoRoot) {
   }
 
   if (command !== undefined) {
-    if (TEST_OR_BUILD.test(command) && !commandLooksLikeMutation(command)) {
-      return { permission: 'allow' }
-    }
     for (const token of pathTokensFromCommand(command)) {
       const rel = toRepoRelative(token, repoRoot)
       if (rel !== undefined && isProtectedRelative(rel)) protectedHits.push(rel)
     }
-    if (protectedHits.length > 0 && commandLooksLikeMutation(command)) {
-      return deny(protectedHits)
-    }
-    if (WRITE_TOOLS.has(toolName) && protectedHits.length > 0) return deny(protectedHits)
-    return { permission: 'allow' }
   }
 
-  if (WRITE_TOOLS.has(toolName) || toolName.length === 0) {
-    if (protectedHits.length > 0) return deny(protectedHits)
+  if (protectedHits.length > 0 && isWriteTool(input.tool_name)) {
+    return deny(protectedHits)
+  }
+  if (command !== undefined && protectedHits.length > 0 && commandLooksLikeMutation(command)) {
+    return deny(protectedHits)
   }
   return { permission: 'allow' }
 }
@@ -172,12 +236,13 @@ function deny(hits) {
   const listed = [...new Set(hits)].join(', ')
   return {
     permission: 'deny',
-    user_message: `已拒绝写入 DSH spine（${listed}）。Cursor 文件工具不受 DSH 文件沙箱约束；请把新行为做成旁边的插件。`,
+    user_message: `已拒绝写入 spine（${listed}）。读取、搜索与非变异 shell 仍允许。`,
     agent_message:
-      `Denied a write under the DSH spine: ${listed}. `
-      + 'Do not edit vendor/, packages/core/, packages/boot/, native/, or .cursor/hooks/. '
-      + 'Put new behavior in a plugin beside those trees (packages/cursor, packages/client, a bundle patch). '
-      + 'The DSH file sandbox does not apply to Cursor file tools; this hook is the fence.',
+      `Denied write under ${listed}. `
+      + 'Reads, Grep/Glob, and non-mutating shells stay allowed. '
+      + 'Do not Write, StrReplace, Delete, or run a mutating shell against '
+      + 'vendor/, packages/core/, packages/boot/, native/, .cursor/hooks/, '
+      + 'or .cursor/hooks.json. packages/cursor/ writes are allowed.',
   }
 }
 
@@ -195,28 +260,43 @@ export function parseHookStdin(raw) {
   return parsed
 }
 
-async function main() {
+async function readStdinObject() {
   const chunks = []
-  for await (const chunk of process.stdin) chunks.push(chunk)
-  const raw = Buffer.concat(chunks).toString('utf8')
-  let input
-  try {
-    input = parseHookStdin(raw)
-  } catch {
-    process.stdout.write(JSON.stringify({
-      permission: 'deny',
-      user_message: 'spine 保护钩子无法解析输入，已拒绝本次操作。',
-      agent_message: 'The DSH spine-protection hook could not parse its JSON stdin and denied the action.',
-    }))
-    return
+  for await (const chunk of process.stdin) {
+    chunks.push(chunk)
+    const text = Buffer.concat(chunks).toString('utf8').replace(/^\uFEFF/, '').trim()
+    if (text.length === 0) continue
+    try {
+      const parsed = JSON.parse(text)
+      if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed
+      }
+    } catch {
+      // incomplete JSON
+    }
   }
-  const repoRoot = typeof input.cwd === 'string' && input.cwd.length > 0
-    ? resolve(input.cwd)
-    : process.cwd()
-  process.stdout.write(JSON.stringify(decide(input, repoRoot)))
+  return parseHookStdin(Buffer.concat(chunks).toString('utf8'))
 }
 
-const entry = process.argv[1]
-if (entry !== undefined && import.meta.url === pathToFileURL(resolve(entry)).href) {
+async function main() {
+  try {
+    const input = await readStdinObject()
+    try {
+      writeFileSync(
+        resolve(REPO_ROOT_FROM_HOOK, '.cursor/protect-spine.last-stdin.json'),
+        JSON.stringify(input, null, 2),
+      )
+    } catch {
+      // dump is best-effort
+    }
+    const result = decide(input, REPO_ROOT_FROM_HOOK)
+    process.stdout.write(JSON.stringify(result))
+    if (result.permission === 'deny') process.exit(2)
+  } catch {
+    process.stdout.write(JSON.stringify({ permission: 'allow' }))
+  }
+}
+
+if (process.argv.some(a => /(?:^|[\\/])protect-spine(?:\.proposed)?\.mjs$/i.test(a))) {
   await main()
 }

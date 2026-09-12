@@ -16,7 +16,8 @@ export const inject = ['invariants']
 
 /**
  * No runtime invariant: the overlay slot registration is an effect owned by
- * the slot registry; the host PTY is owned by dsh-cursor-agent-gateway.
+ * the slot registry; the index boot meta is an HTML tap; the host PTY is
+ * owned by dsh-cursor-agent-gateway.
  */
 const install: InvariantInstaller = () => {}
 

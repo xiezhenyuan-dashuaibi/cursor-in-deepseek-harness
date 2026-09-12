@@ -3,7 +3,8 @@ import {
   appendOverlayCard, appendOverlayCardOccupant, defaultOverlayCardSpec, dropOverlayCard,
   formatOverlayCardInstances, isOverlayCardHidden, isOverlayCardInserted, isOverlayCardMounted,
   isOverlayCardRoster, isProtectedOverlayCardLoaderId, overlayCardBodySlot,
-  overlayCardRosterListsInserted, overlayCardSeatFromBodySlot, overlayCardTrailingSlot, parseOverlayCardInstanceId,
+  overlayCardDeclaredSeatCount, overlayCardRosterListsInserted,
+  overlayCardSeatFromBodySlot, overlayCardTrailingSlot, parseOverlayCardInstanceId,
   parseOverlayCardInstances, persistOverlayCardSpec, resolveOverlayCardInsert,
   setOverlayCardHidden, type OverlayCardSpec,
 } from '../src/instances.ts'
@@ -29,16 +30,21 @@ describe('overlay-card instances', () => {
     expect(overlayCardBodySlot(2)).toBe('overlay-card-2.body')
     expect(overlayCardTrailingSlot(1)).toBe('overlay-card.chrome.trailing')
     expect(overlayCardTrailingSlot(3)).toBe('overlay-card-3.chrome.trailing')
-    expect(() => overlayCardBodySlot(0)).toThrow(/1\.\.8/)
+    expect(() => overlayCardBodySlot(0)).toThrow(/positive integer/)
     expect(overlayCardSeatFromBodySlot('overlay-card.body')).toBe(1)
     expect(overlayCardSeatFromBodySlot('overlay-card-4.body')).toBe(4)
-    expect(overlayCardSeatFromBodySlot('overlay-card-9.body')).toBeUndefined()
+    expect(overlayCardSeatFromBodySlot('overlay-card-9.body')).toBe(9)
+    expect(overlayCardSeatFromBodySlot('overlay-card-10.body')).toBe(10)
+    expect(overlayCardSeatFromBodySlot('overlay-card-1.body')).toBeUndefined()
     expect(parseOverlayCardInstanceId('overlay-card-2')).toBe('2')
     expect(parseOverlayCardInstanceId('overlay-card-draft')).toBe('draft')
     expect(parseOverlayCardInstanceId('ui-float-window')).toBeUndefined()
     expect(isProtectedOverlayCardLoaderId('ui-float-window')).toBe(true)
+    expect(isProtectedOverlayCardLoaderId('ui-overlay-desktop')).toBe(true)
     expect(isProtectedOverlayCardLoaderId('overlay-card-plug-rpc')).toBe(true)
     expect(isProtectedOverlayCardLoaderId('overlay-card-hide-rpc')).toBe(true)
+    expect(isProtectedOverlayCardLoaderId('overlay-plugin-roster-rpc')).toBe(true)
+    expect(isProtectedOverlayCardLoaderId('overlay-plugin-rail-rpc')).toBe(true)
     expect(isProtectedOverlayCardLoaderId('ui-notes')).toBe(false)
     expect(overlayCardRosterListsInserted({ cards: [first] })).toBe(false)
     expect(overlayCardRosterListsInserted({ cards: [{ ...first, inserted: false }] })).toBe(true)
@@ -59,9 +65,15 @@ describe('overlay-card instances', () => {
     expect(() => appendOverlayCard([first], { id: '1' })).toThrow(/already loaded/)
     expect(() => appendOverlayCard([first], { width: 100 })).toThrow(/--width/)
     expect(() => appendOverlayCard([first], { title: '  ' })).toThrow(/--title/)
-    expect(() => appendOverlayCard([
-      first, spec(2), spec(3), spec(4), spec(5), spec(6), spec(7), spec(8),
-    ])).toThrow(/at most 8/)
+    let nine = [first]
+    for (let n = 2; n <= 9; n += 1) nine = appendOverlayCard(nine)
+    expect(nine).toHaveLength(9)
+    expect(nine[8]?.seat).toBe(9)
+    expect(overlayCardBodySlot(9)).toBe('overlay-card-9.body')
+    expect(overlayCardDeclaredSeatCount(0)).toBe(8)
+    expect(overlayCardDeclaredSeatCount(8)).toBe(8)
+    expect(overlayCardDeclaredSeatCount(9)).toBe(16)
+    expect(overlayCardDeclaredSeatCount(17)).toBe(32)
   })
 
   it('round-trips instances.json and migrates plugged:false to hidden', () => {

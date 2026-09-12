@@ -9,6 +9,6 @@ This skill is a reserved slot for **arbitrary-shape floating** overlay occupants
 
 The presentation HOW is not authored. Do not invent a procedure. Do not occupy `overlay-card.body` or copy [`ui-float-window`](../../../packages/client/ui-float-window/README.md) chrome for this form. Do not occupy `root` or reuse id `cursor-agent`. Never restart `dsh web`.
 
-Load this skill when the task is this form so you do not follow [dsh-overlay-web-plugins](../dsh-overlay-web-plugins/SKILL.md). Then stop and tell the user the presentation HOW is not authored.
+Load this skill when the task is this form so you do not follow [dsh-overlay-web-plugins](../dsh-overlay-web-plugins/SKILL.md) or [dsh-overlay-canvas-plugins](../dsh-overlay-canvas-plugins/SKILL.md). Then stop and tell the user the presentation HOW is not authored.
 
 `pnpm overlay:live` is the live insert helper for profile copies. It is not a substitute for this skill’s missing procedure.

@@ -87,6 +87,7 @@
     "@deepseek-ai/dsh-cordis-client-runner": "workspace:^",
     "@deepseek-ai/dsh-cordis-host-runner": "workspace:^",
     "@deepseek-ai/dsh-cursor-agent-gateway": "workspace:^",
+    "@deepseek-ai/dsh-cursor-mcp-server": "workspace:^",
     "@deepseek-ai/dsh-web-frontend": "workspace:^",
     "@deepseek-ai/dsh-host-frontend-static": "workspace:^",
     "@deepseek-ai/dsh-host-apiproxy": "workspace:^",

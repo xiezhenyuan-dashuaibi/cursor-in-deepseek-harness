@@ -5,7 +5,10 @@
  * `./overlay-card-roster-rpc.mjs` when that roster channel is missing, and
  * `./overlay-card-plug-rpc.mjs` so `instances.setHidden` and
  * `occupants.setInserted` can mount beside a cached list-only `/overlay-card`
- * handler.
+ * handler. Any insert or update also writes `./overlay-plugin-roster-rpc.mjs`
+ * and `./overlay-plugin-rail-rpc.mjs` so `/overlay-plugins-rail` can list
+ * desktop occupants when the cached `ui-cursor-agent` `apply` already owns
+ * `/overlay-plugins`.
  */
 
 import { spawnSync } from 'node:child_process'
@@ -33,7 +36,21 @@ import {
   resolveOverlayCardInsert,
   type OverlayCardInsertRequest,
 } from '../packages/client/ui-float-window/src/instances.ts'
+import {
+  OVERLAY_DESKTOP_BODY_SLOT,
+  OVERLAY_DESKTOP_PACKAGE_NAME,
+  OVERLAY_PLUGIN_LIST_ENDPOINT,
+  OVERLAY_PLUGIN_RAIL_RPC_CHANNEL,
+  OVERLAY_PLUGIN_RAIL_RPC_ID,
+  OVERLAY_PLUGIN_RPC_CHANNEL,
+  OVERLAY_PLUGIN_ROSTER_RPC_ID,
+  OVERLAY_PLUGIN_SET_INSERTED_ENDPOINT,
+  OVERLAY_PLUGIN_SWITCH_DESKTOP_ENDPOINT,
+  setDesktopOccupantExclusive,
+} from '../packages/client/ui-cursor-agent/src/plugin-roster.ts'
 import { purgeCheckoutOccupant } from './overlay-page-checkout.ts'
+
+export { OVERLAY_PLUGIN_RAIL_RPC_ID, OVERLAY_PLUGIN_ROSTER_RPC_ID }
 
 /** Loader id for the profile-relative `/overlay-card` module. */
 export const OVERLAY_CARD_ROSTER_RPC_ID = 'overlay-card-roster-rpc'
@@ -62,6 +79,24 @@ export const OVERLAY_CARD_HIDE_RPC_FILE = 'overlay-card-hide-rpc.mjs'
 
 /** Loader name for {@link OVERLAY_CARD_HIDE_RPC_FILE}. */
 export const OVERLAY_CARD_HIDE_RPC_MODULE = `./${OVERLAY_CARD_HIDE_RPC_FILE}`
+
+/** File name written at the profile root for `/overlay-plugins`. */
+const OVERLAY_PLUGIN_ROSTER_RPC_FILE = 'overlay-plugin-roster-rpc.mjs'
+
+/** Loader name for that never-imported specifier. */
+export const OVERLAY_PLUGIN_ROSTER_RPC_MODULE = `./${OVERLAY_PLUGIN_ROSTER_RPC_FILE}`
+
+/** File name written at the profile root for `/overlay-plugins-rail`. */
+const OVERLAY_PLUGIN_RAIL_RPC_FILE = 'overlay-plugin-rail-rpc.mjs'
+
+/** Loader name for {@link OVERLAY_PLUGIN_RAIL_RPC_FILE}. */
+export const OVERLAY_PLUGIN_RAIL_RPC_MODULE = `./${OVERLAY_PLUGIN_RAIL_RPC_FILE}`
+
+/** Second specifier so a later rewrite remounts {@link OVERLAY_PLUGIN_RAIL_RPC_CHANNEL}. */
+const OVERLAY_PLUGIN_RAIL_REMOUNT_FILE = 'overlay-plugin-rail-rpc-2.mjs'
+
+/** Loader name for {@link OVERLAY_PLUGIN_RAIL_REMOUNT_FILE}. */
+export const OVERLAY_PLUGIN_RAIL_REMOUNT_MODULE = `./${OVERLAY_PLUGIN_RAIL_REMOUNT_FILE}`
 
 /** Files copied from a built checkout package into the profile plugin dir. */
 export const PROFILE_LIB_FILES = [
@@ -253,6 +288,31 @@ export function hasOverlayCardPlugRpc(entries: readonly ProfilePatchEntry[]): bo
 }
 
 /**
+ * Whether the profile already has the standalone-fiber roster channel.
+ * @param entries - parsed groups.
+ * @returns true when the plugin-roster RPC row is present.
+ */
+export function hasOverlayPluginRosterRpc(entries: readonly ProfilePatchEntry[]): boolean {
+  return entries.some(entry => entry.insert.some(row => (
+    row.id === OVERLAY_PLUGIN_ROSTER_RPC_ID
+    || row.name === OVERLAY_PLUGIN_ROSTER_RPC_MODULE
+  )))
+}
+
+/**
+ * Whether the profile already has the desktop-rail recovery channel.
+ * @param entries - parsed groups.
+ * @returns true when the rail RPC row is present.
+ */
+export function hasOverlayPluginRailRpc(entries: readonly ProfilePatchEntry[]): boolean {
+  return entries.some(entry => entry.insert.some(row => (
+    row.id === OVERLAY_PLUGIN_RAIL_RPC_ID
+    || row.name === OVERLAY_PLUGIN_RAIL_RPC_MODULE
+    || row.name === OVERLAY_PLUGIN_RAIL_REMOUNT_MODULE
+  )))
+}
+
+/**
  * Append a Loader row to the last insert group, creating one if needed.
  * A second call with an existing id is a no-op.
  * @param entries - parsed groups (mutated).
@@ -267,6 +327,79 @@ export function appendInsertRow(entries: ProfilePatchEntry[], id: string, name: 
     return
   }
   last.insert.push({ id, name })
+}
+
+/**
+ * Set or clear Loader `disabled` on every row with this id.
+ * @param entries - parsed groups (mutated).
+ * @param id - Loader id.
+ * @param disabled - true writes `disabled: true`; false removes the field.
+ * @returns true when a row changed.
+ */
+export function setInsertRowDisabled(
+  entries: ProfilePatchEntry[],
+  id: string,
+  disabled: boolean,
+): boolean {
+  let changed = false
+  for (const entry of entries) {
+    for (const row of entry.insert) {
+      if (row.id !== id) continue
+      if (disabled) {
+        if (row.disabled === true) continue
+        row.disabled = true
+        changed = true
+        continue
+      }
+      if (row.disabled !== true) continue
+      delete row.disabled
+      changed = true
+    }
+  }
+  return changed
+}
+
+/**
+ * Disable then re-enable a Loader row so Cordis remounts that fiber.
+ * @param patchPath - profile `cordis.patch.yml`.
+ * @param id - Loader id.
+ * @param options - settle delay between the two writes. Tests stub `sleep`.
+ */
+export async function remountInsertRow(
+  patchPath: string,
+  id: string,
+  options: { settleMs?: number; sleep?: (ms: number) => Promise<void> } = {},
+): Promise<void> {
+  const settleMs = options.settleMs ?? 800
+  const sleep = options.sleep ?? ((ms: number) => new Promise(resolve => setTimeout(resolve, ms)))
+  const first = parseProfilePatch(await readFile(patchPath, 'utf8'))
+  if (!setInsertRowDisabled(first.entries, id, true)) {
+    throw new Error(`overlay-live-plugin: cannot remount missing Loader id ${id}`)
+  }
+  await writeFile(patchPath, dumpProfilePatch(first.comments, first.entries))
+  await sleep(settleMs)
+  const second = parseProfilePatch(await readFile(patchPath, 'utf8'))
+  if (!setInsertRowDisabled(second.entries, id, false)) {
+    throw new Error(`overlay-live-plugin: cannot re-enable Loader id ${id}`)
+  }
+  await writeFile(patchPath, dumpProfilePatch(second.comments, second.entries))
+}
+
+/**
+ * Drop `dsh.client.overlayBody` so an older client-modules scanner can admit
+ * the package. Rail and exclusive-desktop insert still read the checkout
+ * `package.json`.
+ * @param manifest - live plugin `package.json` object.
+ * @returns a shallow copy without `overlayBody`, or `undefined` when absent.
+ */
+export function omitClientOverlayBody(manifest: Record<string, unknown>): Record<string, unknown> | undefined {
+  const dsh = manifest.dsh
+  if (!isJsonObject(dsh)) return undefined
+  const client = dsh.client
+  if (!isJsonObject(client) || typeof client.overlayBody !== 'string') return undefined
+  const nextClient = { ...client }
+  delete nextClient.overlayBody
+  return { ...manifest, dsh: { ...dsh, client: nextClient } }
 }
 
 /**
@@ -292,7 +425,7 @@ export async function copyProfileLib(fromPkg: string, toPkg: string): Promise<vo
   } catch (error) {
     if (isMissing(error)) {
       throw new Error(
-        `overlay-live-plugin: missing ${index}; run tsc -p <pkg>/tsconfig.json and tsdown in that package first`,
+        `overlay-live-plugin: missing ${index}; overlay:live insert/update runs tsc -p tsconfig.json and pnpm run bundle when tsdown.config.ts is present`,
       )
     }
     throw error
@@ -308,6 +441,367 @@ export async function copyProfileLib(fromPkg: string, toPkg: string): Promise<vo
       throw error
     }
   }
+}
+
+/** Default origin of the overlay Cursor `dsh web` page. */
+export const DEFAULT_OVERLAY_LIVE_ORIGIN = 'http://127.0.0.1:3080'
+
+/** HTTP path of the Host plugin-inventory list Remote. */
+export const PLUGIN_INVENTORY_LIST_ENDPOINT = '/api/pluginInventory/list'
+
+/** Typert method name for {@link PLUGIN_INVENTORY_LIST_ENDPOINT}. */
+const PLUGIN_INVENTORY_LIST_METHOD = 'pluginInventory/list'
+
+/** Loader fiber projection used when classifying a boot-graph miss. */
+export interface LiveClientFiber {
+  /** Effective Loader enablement. */
+  readonly enabled: boolean
+  /** Root Fiber phase, or `null` when the entry has no live root Fiber. */
+  readonly fiberPhase: string | null
+}
+
+/** Result of one `pluginInventory/list` probe. */
+export type LiveClientFiberProbe =
+  | { readonly kind: 'match'; readonly fiber: LiveClientFiber }
+  | { readonly kind: 'absent' }
+  | { readonly kind: 'unreachable'; readonly detail: string }
+
+/** Context passed to {@link OverlayLiveOptions.waitForClientRow} after yaml write. */
+export interface LiveClientWaitContext {
+  /** Loader directory id. */
+  readonly loaderId: string
+  /** Profile copy of the plugin `package.json`. */
+  readonly liveManifestPath: string
+  /** Profile `cordis.patch.yml`. */
+  readonly patchPath: string
+}
+
+/**
+ * Boot-graph wait that timed out. {@link confirmLiveClientBoot} classifies this
+ * against Loader inventory before the CLI prints stderr.
+ */
+export class LiveClientBootWaitError extends Error {
+  readonly packageName: string
+  readonly origin: string
+  readonly lastStatus: string
+
+  /**
+   * @param packageName - npm name used as the boot-graph id.
+   * @param origin - overlay origin that was polled.
+   * @param lastStatus - last HTTP or network observation.
+   */
+  constructor(packageName: string, origin: string, lastStatus: string) {
+    super(
+      `overlay-live-plugin: ${packageName} is not in window.__DSH_BOOT__ at ${origin} (${lastStatus}).`,
+    )
+    this.name = 'LiveClientBootWaitError'
+    this.packageName = packageName
+    this.origin = origin
+    this.lastStatus = lastStatus
+  }
+}
+
+/**
+ * Whether index HTML injects this package in `window.__DSH_BOOT__`.
+ * The plugin rail lists profile yaml; this graph is the live Loader table.
+ * @param html - `GET /` body.
+ * @param packageName - npm name used as the boot-graph id.
+ * @returns true when an entry id matches.
+ */
+export function bootGraphHasPackage(html: string, packageName: string): boolean {
+  const assigned = /window\.__DSH_BOOT__\s*=\s*/.exec(html)
+  if (assigned === null) return false
+  const jsonStart = assigned.index + assigned[0].length
+  const jsonEnd = html.indexOf('</script>', jsonStart)
+  if (jsonEnd === -1) return false
+  const raw = html.slice(jsonStart, jsonEnd).trim().replace(/;+\s*$/, '')
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return false
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed) || !('entries' in parsed)) return false
+  const entries = parsed.entries
+  if (!Array.isArray(entries)) return false
+  return entries.some((entry) => {
+    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) return false
+    return (entry as { id?: unknown }).id === packageName
+  })
+}
+
+/**
+ * Poll `GET origin` until the package is in the boot graph.
+ * @param packageName - npm name used as the boot-graph id.
+ * @param options - origin, fetch, and timing. Tests stub `fetchImpl`.
+ * @returns after the row is present.
+ * @throws {LiveClientBootWaitError} when the origin stays unreachable or the row is still missing.
+ */
+export async function waitUntilBootGraphHas(
+  packageName: string,
+  options: {
+    origin?: string
+    fetchImpl?: typeof fetch
+    timeoutMs?: number
+    intervalMs?: number
+  } = {},
+): Promise<void> {
+  const origin = resolveOverlayLiveOrigin(options.origin)
+  const fetchImpl = options.fetchImpl ?? fetch
+  const timeoutMs = options.timeoutMs ?? 8_000
+  const intervalMs = options.intervalMs ?? 250
+  const deadline = Date.now() + timeoutMs
+  let lastStatus = 'unreachable'
+  while (Date.now() <= deadline) {
+    try {
+      const response = await fetchImpl(origin, { headers: { accept: 'text/html' } })
+      const html = await response.text()
+      if (bootGraphHasPackage(html, packageName)) return
+      lastStatus = `http ${String(response.status)} without ${packageName}`
+    } catch (error) {
+      lastStatus = error instanceof Error ? error.message : String(error)
+    }
+    await new Promise(resolve => setTimeout(resolve, intervalMs))
+  }
+  throw new LiveClientBootWaitError(packageName, origin, lastStatus)
+}
+
+/**
+ * Read one Loader fiber from `pluginInventory/list`.
+ * @param packageName - npm name the Loader imports.
+ * @param options - origin and fetch. Tests stub `fetchImpl`.
+ * @returns a match, absence, or an unreachable probe.
+ */
+export async function readLiveFiberProbe(
+  packageName: string,
+  options: {
+    origin?: string
+    fetchImpl?: typeof fetch
+  } = {},
+): Promise<LiveClientFiberProbe> {
+  const origin = resolveOverlayLiveOrigin(options.origin)
+  const fetchImpl = options.fetchImpl ?? fetch
+  const url = `${origin}${PLUGIN_INVENTORY_LIST_ENDPOINT}`
+  try {
+    const response = await fetchImpl(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        type: 'client-request',
+        rpcId: `overlay-live-${PLUGIN_INVENTORY_LIST_METHOD}-${crypto.randomUUID()}`,
+        method: PLUGIN_INVENTORY_LIST_METHOD,
+        payload: { args: {} },
+      }),
+    })
+    const text = await response.text()
+    if (!response.ok) {
+      return { kind: 'unreachable', detail: `http ${String(response.status)}` }
+    }
+    return matchLiveFiber(packageName, text)
+  } catch (error) {
+    return { kind: 'unreachable', detail: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+/**
+ * Wait for the boot graph, then classify a miss against Loader inventory.
+ * An active fiber with a string `overlayBody` on the live copy is remounted
+ * once without that field, then the field is restored without a second remount.
+ * @param packageName - npm name used as the boot-graph id.
+ * @param options - origin, fetch, live copy, and remount hook.
+ * @returns after the row is present.
+ * @throws when the row stays missing. Stderr names fiber vs compose, not the rail.
+ */
+export async function confirmLiveClientBoot(
+  packageName: string,
+  options: {
+    origin?: string
+    fetchImpl?: typeof fetch
+    timeoutMs?: number
+    intervalMs?: number
+    recoverTimeoutMs?: number
+    liveManifestPath?: string
+    remountFiber?: () => Promise<void>
+  } = {},
+): Promise<void> {
+  const origin = resolveOverlayLiveOrigin(options.origin)
+  const waitOpts = {
+    origin,
+    fetchImpl: options.fetchImpl,
+    intervalMs: options.intervalMs,
+  }
+  try {
+    await waitUntilBootGraphHas(packageName, {
+      ...waitOpts,
+      timeoutMs: options.timeoutMs ?? 15_000,
+    })
+    return
+  } catch (first) {
+    if (!(first instanceof LiveClientBootWaitError)) throw first
+    const probe = await readLiveFiberProbe(packageName, {
+      origin,
+      fetchImpl: options.fetchImpl,
+    })
+    const recovered = await recoverComposeMiss(packageName, first, probe, options, waitOpts)
+    if (recovered) return
+    throw new Error(liveClientBootMissMessage(packageName, origin, first.lastStatus, probe))
+  }
+}
+
+function resolveOverlayLiveOrigin(origin: string | undefined): string {
+  const fromEnv = origin ?? process.env.DSH_OVERLAY_ORIGIN
+  if (fromEnv !== undefined && fromEnv.trim().length > 0) return fromEnv.trim()
+  return DEFAULT_OVERLAY_LIVE_ORIGIN
+}
+
+function matchLiveFiber(packageName: string, text: string): LiveClientFiberProbe {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch (error) {
+    return { kind: 'unreachable', detail: error instanceof Error ? error.message : String(error) }
+  }
+  const snapshot = inventorySnapshotOf(parsed)
+  if (snapshot === undefined) return { kind: 'unreachable', detail: 'pluginInventory/list payload is not a snapshot' }
+  const matches: LiveClientFiber[] = []
+  for (const entry of snapshot) {
+    if (entry.moduleName !== packageName) continue
+    matches.push({ enabled: entry.enabled, fiberPhase: entry.fiberPhase })
+  }
+  if (matches.length === 0) return { kind: 'absent' }
+  const first = matches[0]
+  if (first === undefined) return { kind: 'absent' }
+  const active = matches.find(fiber => fiber.enabled && fiber.fiberPhase === 'active')
+  return { kind: 'match', fiber: active ?? first }
+}
+
+function inventorySnapshotOf(body: unknown): ReadonlyArray<{
+  moduleName: string
+  enabled: boolean
+  fiberPhase: string | null
+}> | undefined {
+  const value = rpcValueOf(body)
+  if (!isJsonObject(value) || !Array.isArray(value.entries)) return undefined
+  const entries: { moduleName: string; enabled: boolean; fiberPhase: string | null }[] = []
+  for (const entry of value.entries) {
+    if (!isJsonObject(entry) || typeof entry.moduleName !== 'string' || typeof entry.enabled !== 'boolean') {
+      return undefined
+    }
+    const fiberPhase = entry.fiberPhase
+    if (fiberPhase !== null && typeof fiberPhase !== 'string') return undefined
+    entries.push({ moduleName: entry.moduleName, enabled: entry.enabled, fiberPhase })
+  }
+  return entries
+}
+
+function rpcValueOf(body: unknown): unknown {
+  if (!isJsonObject(body)) return undefined
+  if (!('result' in body)) return body
+  const result = body.result
+  if (!isJsonObject(result) || typeof result.ok !== 'boolean') return undefined
+  if (!result.ok) return undefined
+  return result.value
+}
+
+async function recoverComposeMiss(
+  packageName: string,
+  first: LiveClientBootWaitError,
+  probe: LiveClientFiberProbe,
+  options: {
+    fetchImpl?: typeof fetch
+    intervalMs?: number
+    recoverTimeoutMs?: number
+    liveManifestPath?: string
+    remountFiber?: () => Promise<void>
+  },
+  waitOpts: { origin: string; fetchImpl?: typeof fetch; intervalMs?: number },
+): Promise<boolean> {
+  if (
+    probe.kind !== 'match'
+    || !probe.fiber.enabled
+    || probe.fiber.fiberPhase !== 'active'
+    || options.liveManifestPath === undefined
+    || options.remountFiber === undefined
+  ) {
+    return false
+  }
+  const original = await readFile(options.liveManifestPath, 'utf8')
+  const omitted = omitClientOverlayBody(readJsonObject(original, 'live package.json'))
+  if (omitted === undefined) return false
+  await writeFile(options.liveManifestPath, `${JSON.stringify(omitted, null, 2)}\n`)
+  try {
+    await options.remountFiber()
+    await waitUntilBootGraphHas(packageName, {
+      ...waitOpts,
+      timeoutMs: options.recoverTimeoutMs ?? 8_000,
+    })
+    return true
+  } catch (second) {
+    const status = second instanceof LiveClientBootWaitError
+      ? second.lastStatus
+      : second instanceof Error ? second.message : first.lastStatus
+    throw new Error(liveClientBootMissMessage(packageName, first.origin, status, probe))
+  } finally {
+    await writeFile(options.liveManifestPath, original)
+  }
+}
+
+function liveClientBootMissMessage(
+  packageName: string,
+  origin: string,
+  lastStatus: string,
+  probe: LiveClientFiberProbe,
+): string {
+  const head = `overlay-live-plugin: ${packageName} is not in window.__DSH_BOOT__ at ${origin} (${lastStatus}).`
+  const rail = 'The plugin rail lists profile yaml; that list is not the boot graph.'
+  const never = 'Do not restart dsh web.'
+  if (probe.kind === 'unreachable') {
+    return `${head} ${rail} pluginInventory/list was unreachable (${probe.detail}). ${never} Do not rename the package.`
+  }
+  if (probe.kind === 'absent') {
+    return `${head} ${rail} No Loader fiber for this package name. ${never} If this process already failed the first ESM import of this package name, insert under a new npm name and a new --id.`
+  }
+  const fiber = probe.fiber
+  if (!fiber.enabled) {
+    return `${head} ${rail} Loader row is disabled (fiberPhase ${String(fiber.fiberPhase)}). ${never} Do not rename the package.`
+  }
+  if (fiber.fiberPhase === 'active') {
+    return `${head} ${rail} Loader fiber is active; client-modules did not add this package to the boot graph. ${never} Do not rename the package.`
+  }
+  if (fiber.fiberPhase === 'failed') {
+    return `${head} ${rail} Loader fiberPhase is failed. ${never} Insert under a new npm name and a new --id.`
+  }
+  return `${head} ${rail} Loader fiberPhase is ${String(fiber.fiberPhase)}. ${never} Do not rename the package.`
+}
+
+/**
+ * Run checkout `tsc` + `bundle` when `tsdown.config.ts` exists.
+ * @param checkout - checkout package directory.
+ * @param build - `tsc -p tsconfig.json` then `pnpm run bundle` in that directory.
+ * @returns after `build` runs, or immediately when `tsdown.config.ts` is absent.
+ */
+export async function buildCheckoutLib(checkout: string, build: (cwd: string) => void): Promise<void> {
+  try {
+    await access(join(checkout, 'tsdown.config.ts'))
+  } catch (error) {
+    if (isMissing(error)) return
+    throw error
+  }
+  build(checkout)
+}
+
+/**
+ * Emit types and the tsdown artifact in a checkout package.
+ * @param cwd - checkout package directory.
+ * @returns after `tsc -p tsconfig.json` and `pnpm run bundle` succeed.
+ */
+export function defaultOverlayCheckoutBuild(cwd: string): void {
+  runPnpm(
+    cwd,
+    ['exec', 'tsc', '--pretty', 'false', '-p', 'tsconfig.json'],
+    `overlay-live-plugin: tsc -p tsconfig.json failed in ${cwd}`,
+  )
+  runPnpm(cwd, ['run', 'bundle'], `overlay-live-plugin: pnpm run bundle failed in ${cwd}`)
 }
 
 /** Options for {@link runOverlayLivePlugin}. */
@@ -327,6 +821,17 @@ export interface OverlayLiveOptions {
   workspaceInstall?: (cwd: string) => void
   /** After deleting a checkout package, regenerate derived catalogs. */
   refreshCatalogs?: (cwd: string) => void
+  /**
+   * Emit checkout `lib/` when `tsdown.config.ts` exists. The CLI supplies
+   * {@link defaultOverlayCheckoutBuild}; tests stub or omit this.
+   */
+  build?: (cwd: string) => void
+  /**
+   * After inserting a `dsh.client` package, wait until this package name is
+   * in the live boot graph. The CLI supplies {@link confirmLiveClientBoot};
+   * tests omit this or stub it.
+   */
+  waitForClientRow?: (packageName: string, wait: LiveClientWaitContext) => Promise<void>
 }
 
 /**
@@ -350,6 +855,9 @@ export async function runOverlayLivePlugin(argv: string[], options: OverlayLiveO
   }
   const checkout = resolve(parsed.packageDir)
   const source = readCheckoutManifest(await readFile(join(checkout, 'package.json'), 'utf8'))
+  if (!parsed.noBuild && options.build !== undefined) {
+    await buildCheckoutLib(checkout, options.build)
+  }
   const cardRequest = overlayCardInsertRequest(parsed)
   if (hasOverlayCardInsertFlags(parsed) && source.name !== OVERLAY_CARD_PACKAGE_NAME) {
     throw new Error(
@@ -362,8 +870,23 @@ export async function runOverlayLivePlugin(argv: string[], options: OverlayLiveO
     if (existing !== undefined) {
       const added = await addOverlayCardInstance(join(profileRoot, 'plugins', existing.id), cardRequest)
       await ensureOverlayCardHostChannels(profileRoot, patchPath)
+      await ensureOverlayPluginRosterChannel(profileRoot, patchPath)
       return `overlay-live-plugin: added card ${added.id} (${existing.id})`
     }
+  }
+  if (parsed.command === 'insert' && source.name === OVERLAY_DESKTOP_PACKAGE_NAME) {
+    const existing = findInsertRowByName(patch.entries, source.name)
+    if (existing !== undefined) {
+      await ensureOverlayPluginRosterChannel(profileRoot, patchPath)
+      return `overlay-live-plugin: desktop host already inserted (${existing.id})`
+    }
+  }
+  if (
+    parsed.command === 'insert'
+    && overlayBodyFromClient(source.dsh?.client) === OVERLAY_DESKTOP_BODY_SLOT
+    && findInsertRowByName(patch.entries, OVERLAY_DESKTOP_PACKAGE_NAME) === undefined
+  ) {
+    throw new Error('overlay-live-plugin: overlay desktop plugin is not loaded')
   }
   const id = parsed.id
     ?? findInsertRowByName(patch.entries, source.name)?.id
@@ -379,9 +902,11 @@ export async function runOverlayLivePlugin(argv: string[], options: OverlayLiveO
       throw error
     }
     await copyProfileLib(checkout, dest)
+    await writeFile(join(dest, 'package.json'), `${JSON.stringify(stripProfileManifest(source), null, 2)}\n`)
     if (source.name === OVERLAY_CARD_PACKAGE_NAME) {
       await ensureOverlayCardHostChannels(profileRoot, patchPath, true)
     }
+    await ensureOverlayPluginRosterChannel(profileRoot, patchPath)
     await bindOverlayCardOccupant(profileRoot, patchPath, source, id)
     return `overlay-live-plugin: updated ${id} lib under ${dest}`
   }
@@ -407,7 +932,13 @@ export async function runOverlayLivePlugin(argv: string[], options: OverlayLiveO
   if (source.name === OVERLAY_CARD_PACKAGE_NAME) {
     await ensureOverlayCardHostChannels(profileRoot, patchPath)
   }
+  await ensureOverlayPluginRosterChannel(profileRoot, patchPath)
   await bindOverlayCardOccupant(profileRoot, patchPath, source, id)
+  await confirmLiveClientRow(source, parsed, options, {
+    loaderId: id,
+    liveManifestPath: join(dest, 'package.json'),
+    patchPath,
+  })
   return `overlay-live-plugin: inserted ${id} (${source.name}) into ${profileRoot}`
 }
 
@@ -417,6 +948,8 @@ interface ParsedArgv {
   id?: string
   profile?: string
   keepFiles: boolean
+  noBuild: boolean
+  noWait: boolean
   cardTitle?: string
   cardId?: string
   cardWidth?: number
@@ -427,12 +960,14 @@ function parseArgv(argv: string[]): ParsedArgv {
   const command = argv[0]
   if (command !== 'insert' && command !== 'update' && command !== 'remove') {
     throw new Error(
-      'overlay-live-plugin: usage: insert|update <pkgDir> | remove <id> [--profile web] [--id <id>] [--keep-files] [--title <name>] [--card-id <id>] [--width <px>] [--height <px>]',
+      'overlay-live-plugin: usage: insert|update <pkgDir> | remove <id> [--profile web] [--id <id>] [--keep-files] [--no-build] [--no-wait] [--title <name>] [--card-id <id>] [--width <px>] [--height <px>]',
     )
   }
   let profile: string | undefined
   let id: string | undefined
   let keepFiles = false
+  let noBuild = false
+  let noWait = false
   let cardTitle: string | undefined
   let cardId: string | undefined
   let cardWidth: number | undefined
@@ -453,6 +988,14 @@ function parseArgv(argv: string[]): ParsedArgv {
     }
     if (token === '--keep-files') {
       keepFiles = true
+      continue
+    }
+    if (token === '--no-build') {
+      noBuild = true
+      continue
+    }
+    if (token === '--no-wait') {
+      noWait = true
       continue
     }
     if (token === '--title') {
@@ -480,7 +1023,9 @@ function parseArgv(argv: string[]): ParsedArgv {
     }
     positionals.push(token)
   }
-  const parsed: ParsedArgv = { command, packageDir: '', id, profile, keepFiles, cardTitle, cardId, cardWidth, cardHeight }
+  const parsed: ParsedArgv = {
+    command, packageDir: '', id, profile, keepFiles, noBuild, noWait, cardTitle, cardId, cardWidth, cardHeight,
+  }
   if (command !== 'insert' && hasOverlayCardInsertFlags(parsed)) {
     throw new Error('overlay-live-plugin: --title / --card-id / --width / --height apply only to insert of packages/client/ui-float-window')
   }
@@ -508,6 +1053,28 @@ function overlayCardInsertRequest(parsed: ParsedArgv): OverlayCardInsertRequest 
     width: parsed.cardWidth,
     height: parsed.cardHeight,
   }
+}
+
+/**
+ * After yaml write, wait until a `dsh.client` package is in the live boot graph.
+ * Tests omit {@link OverlayLiveOptions.waitForClientRow}; the CLI supplies
+ * {@link confirmLiveClientBoot} with the live copy path and a remount hook.
+ */
+async function confirmLiveClientRow(
+  source: CheckoutManifest,
+  parsed: ParsedArgv,
+  options: OverlayLiveOptions,
+  wait: LiveClientWaitContext,
+): Promise<void> {
+  if (
+    parsed.noWait
+    || options.waitForClientRow === undefined
+    || source.dsh?.client === undefined
+    || typeof source.name !== 'string'
+  ) {
+    return
+  }
+  await options.waitForClientRow(source.name, wait)
 }
 
 async function removePlugin(
@@ -584,6 +1151,107 @@ async function ensureOverlayCardHostChannels(
 ): Promise<void> {
   await ensureOverlayCardRosterChannel(profileRoot, patchPath)
   await ensureOverlayCardPlugChannel(profileRoot, patchPath, remountPlug)
+}
+
+/**
+ * Refresh `./overlay-plugin-roster-rpc.mjs` and `./overlay-plugin-rail-rpc.mjs`.
+ * Node caches the first `apply` of `@deepseek-ai/dsh-client-ui-cursor-agent`,
+ * so that fiber keeps `/overlay-plugins`. The rail specifier is a new URL and
+ * registers `/overlay-plugins-rail`. A later rewrite whose sidecar source
+ * changed retargets the rail row so Node imports the updated `apply`.
+ * @param profileRoot - `$DSH_HOME/profiles/<name>`.
+ * @param patchPath - `cordis.patch.yml` in that directory.
+ */
+async function ensureOverlayPluginRosterChannel(
+  profileRoot: string,
+  patchPath: string,
+): Promise<void> {
+  const rosterSource = overlayPluginRosterRpcSource(OVERLAY_PLUGIN_RPC_CHANNEL)
+  const railSource = overlayPluginRosterRpcSource(OVERLAY_PLUGIN_RAIL_RPC_CHANNEL)
+  await writeFile(join(profileRoot, OVERLAY_PLUGIN_ROSTER_RPC_FILE), rosterSource)
+  const latest = parseProfilePatch(await readFile(patchPath, 'utf8'))
+  let changed = false
+  if (!hasOverlayPluginRosterRpc(latest.entries)) {
+    appendInsertRow(latest.entries, OVERLAY_PLUGIN_ROSTER_RPC_ID, OVERLAY_PLUGIN_ROSTER_RPC_MODULE)
+    changed = true
+  }
+  const railRow = findOverlayPluginRailRpc(latest.entries)
+  const previousRail = railRow === undefined
+    ? undefined
+    : await readOptionalText(join(profileRoot, overlayPluginRailRpcFile(railRow.name)))
+  await writeFile(join(profileRoot, OVERLAY_PLUGIN_RAIL_RPC_FILE), railSource)
+  await writeFile(join(profileRoot, OVERLAY_PLUGIN_RAIL_REMOUNT_FILE), railSource)
+  if (railRow === undefined) {
+    appendInsertRow(latest.entries, OVERLAY_PLUGIN_RAIL_RPC_ID, OVERLAY_PLUGIN_RAIL_RPC_MODULE)
+    changed = true
+  } else if (previousRail !== railSource && retargetOverlayPluginRailRpc(latest.entries)) {
+    changed = true
+  }
+  if (!changed) return
+  await writeFile(patchPath, dumpProfilePatch(latest.comments, latest.entries))
+}
+
+/**
+ * Loader row that registers {@link OVERLAY_PLUGIN_RAIL_RPC_CHANNEL}.
+ * @param entries - parsed groups.
+ */
+function findOverlayPluginRailRpc(entries: readonly ProfilePatchEntry[]): LoaderInsertRow | undefined {
+  for (const entry of entries) {
+    for (const row of entry.insert) {
+      if (
+        row.id === OVERLAY_PLUGIN_RAIL_RPC_ID
+        || row.name === OVERLAY_PLUGIN_RAIL_RPC_MODULE
+        || row.name === OVERLAY_PLUGIN_RAIL_REMOUNT_MODULE
+      ) {
+        return row
+      }
+    }
+  }
+  return undefined
+}
+
+/**
+ * Profile-relative file for a rail-rpc Loader `name`.
+ * @param name - `./overlay-plugin-rail-rpc.mjs` or the remount specifier.
+ */
+function overlayPluginRailRpcFile(name: string): string {
+  return name === OVERLAY_PLUGIN_RAIL_REMOUNT_MODULE
+    ? OVERLAY_PLUGIN_RAIL_REMOUNT_FILE
+    : OVERLAY_PLUGIN_RAIL_RPC_FILE
+}
+
+/**
+ * Read a UTF-8 file, or `undefined` when it is missing.
+ * @param path - absolute path.
+ */
+async function readOptionalText(path: string): Promise<string | undefined> {
+  try {
+    return await readFile(path, 'utf8')
+  } catch (error) {
+    if (isMissing(error)) return undefined
+    throw error
+  }
+}
+
+/**
+ * Point the rail-rpc Loader row at the specifier it is not already using.
+ * @param entries - parsed groups (mutated).
+ * @returns true when a row name changed.
+ */
+export function retargetOverlayPluginRailRpc(entries: ProfilePatchEntry[]): boolean {
+  let changed = false
+  for (const entry of entries) {
+    for (const row of entry.insert) {
+      if (row.id !== OVERLAY_PLUGIN_RAIL_RPC_ID) continue
+      const next = row.name === OVERLAY_PLUGIN_RAIL_RPC_MODULE
+        ? OVERLAY_PLUGIN_RAIL_REMOUNT_MODULE
+        : OVERLAY_PLUGIN_RAIL_RPC_MODULE
+      if (row.name === next) continue
+      row.name = next
+      changed = true
+    }
+  }
+  return changed
 }
 
 /**
@@ -687,7 +1355,7 @@ export function overlayCardRosterRpcSource(channel: string = OVERLAY_CARD_RPC_CH
     `const SET_INSERTED = ${setInserted}`,
     `const INSTANCES = ${instances}`,
     `const FALLBACK = ${fallback}`,
-    "const PROTECTED = new Set(['ui-float-window', 'ui-cursor-agent', 'cursor-agent', 'overlay-card-roster-rpc', 'overlay-card-plug-rpc', 'overlay-card-hide-rpc', 'overlay-card-rpc'])",
+    "const PROTECTED = new Set(['ui-float-window', 'ui-overlay-desktop', 'ui-cursor-agent', 'cursor-agent', 'overlay-card-roster-rpc', 'overlay-card-plug-rpc', 'overlay-card-hide-rpc', 'overlay-card-rpc', 'overlay-plugin-roster-rpc', 'overlay-plugin-rail-rpc'])",
     '',
     'function isMissing(error) {',
     "  return error instanceof Error && 'code' in error && error.code === 'ENOENT'",
@@ -916,19 +1584,270 @@ export function overlayCardRosterRpcSource(channel: string = OVERLAY_CARD_RPC_CH
   ].join('\n')
 }
 
+/**
+ * Profile-relative host module that lists overlay fibers and desktop
+ * occupants and writes Loader `disabled`. Duplicate `rpc.handle` is ignored
+ * so a later boot where package `apply` also registers does not fail the fiber.
+ */
+export function overlayPluginRosterRpcSource(
+  channel: string = OVERLAY_PLUGIN_RPC_CHANNEL,
+): string {
+  const channelJson = JSON.stringify(channel)
+  const list = JSON.stringify(OVERLAY_PLUGIN_LIST_ENDPOINT)
+  const setInserted = JSON.stringify(OVERLAY_PLUGIN_SET_INSERTED_ENDPOINT)
+  const switchDesktop = JSON.stringify(OVERLAY_PLUGIN_SWITCH_DESKTOP_ENDPOINT)
+  const rosterId = JSON.stringify(OVERLAY_PLUGIN_ROSTER_RPC_ID)
+  const railId = JSON.stringify(OVERLAY_PLUGIN_RAIL_RPC_ID)
+  const desktopBody = JSON.stringify(OVERLAY_DESKTOP_BODY_SLOT)
+  const hostName = JSON.stringify(OVERLAY_DESKTOP_PACKAGE_NAME)
+  return [
+    "import { readFileSync, writeFileSync } from 'node:fs'",
+    "import { dirname, join } from 'node:path'",
+    "import { fileURLToPath } from 'node:url'",
+    '',
+    "export const inject = ['connection']",
+    '',
+    `const CHANNEL = ${channelJson}`,
+    `const LIST = ${list}`,
+    `const SET_INSERTED = ${setInserted}`,
+    `const SWITCH_DESKTOP = ${switchDesktop}`,
+    `const DESKTOP_BODY = ${desktopBody}`,
+    `const HOST_NAME = ${hostName}`,
+    `const PROTECTED = new Set(['ui-float-window', 'ui-overlay-desktop', 'ui-cursor-agent', 'cursor-agent', 'overlay-card-roster-rpc', 'overlay-card-plug-rpc', 'overlay-card-hide-rpc', 'overlay-card-rpc', ${rosterId}, ${railId}])`,
+    '',
+    'function isMissing(error) {',
+    "  return error instanceof Error && 'code' in error && error.code === 'ENOENT'",
+    '}',
+    '',
+    'function yamlScalar(raw) {',
+    '  const text = raw.trim()',
+    '  if (text.length >= 2) {',
+    '    const start = text[0]',
+    '    const end = text[text.length - 1]',
+    "    if ((start === \"'\" && end === \"'\") || (start === '\"' && end === '\"')) return text.slice(1, -1)",
+    '  }',
+    '  return text',
+    '}',
+    '',
+    'function loaderRowBlocks(lines) {',
+    '  const blocks = []',
+    '  for (let index = 0; index < lines.length; index += 1) {',
+    '    const line = lines[index]',
+    '    const idMatch = /^(\\s*)- id:\\s*(.+?)\\s*$/.exec(line)',
+    '    if (idMatch === null) continue',
+    '    const dashIndent = idMatch[1]',
+    '    const id = yamlScalar(idMatch[2])',
+    '    if (id.length === 0) continue',
+    "    let keyIndent = dashIndent + '  '",
+    '    let disabledLine',
+    '    let endLine = index',
+    '    for (let cursor = index + 1; cursor < lines.length; cursor += 1) {',
+    '      const body = lines[cursor]',
+    '      if (body.trim().length === 0) continue',
+    '      const indent = /^(\\s*)/.exec(body)[1]',
+    '      if (indent.length <= dashIndent.length) break',
+    '      if (/^\\s*- /.test(body)) break',
+    '      endLine = cursor',
+    '      const nameMatch = /^\\s+name:\\s*(.+?)\\s*$/.exec(body)',
+    '      if (nameMatch) keyIndent = indent',
+    '      if (/^\\s+disabled:\\s*true\\s*$/.test(body)) disabledLine = cursor',
+    '    }',
+    '    blocks.push({ id, keyIndent, endLine, disabledLine })',
+    '  }',
+    '  return blocks',
+    '}',
+    '',
+    'function readPkg(pluginsDir, id) {',
+    '  try {',
+    "    const raw = JSON.parse(readFileSync(join(pluginsDir, id, 'package.json'), 'utf8'))",
+    '    if (raw === null || typeof raw !== \'object\' || Array.isArray(raw)) return undefined',
+    '    return raw',
+    '  } catch (error) {',
+    '    if (isMissing(error)) return undefined',
+    '    throw error',
+    '  }',
+    '}',
+    '',
+    'function dshClient(pkg) {',
+    '  const dsh = pkg.dsh',
+    '  if (dsh === null || typeof dsh !== \'object\' || Array.isArray(dsh)) return undefined',
+    '  const client = dsh.client',
+    '  if (client === null || typeof client !== \'object\' || Array.isArray(client)) return undefined',
+    '  return client',
+    '}',
+    '',
+    'function railKind(id, pluginsDir) {',
+    '  if (PROTECTED.has(id)) return undefined',
+    '  const pkg = readPkg(pluginsDir, id)',
+    '  if (pkg === undefined) return undefined',
+    '  if (pkg.name === HOST_NAME) return undefined',
+    '  const client = dshClient(pkg)',
+    '  if (client === undefined) return undefined',
+    '  if (typeof client.overlayBody === \'string\') {',
+    '    return client.overlayBody === DESKTOP_BODY ? \'desktop\' : undefined',
+    '  }',
+    "  return 'fiber'",
+    '}',
+    '',
+    'function titleOf(id, pluginsDir) {',
+    '  const pkg = readPkg(pluginsDir, id)',
+    '  const client = pkg === undefined ? undefined : dshClient(pkg)',
+    '  if (typeof client?.panelTitle === \'string\' && client.panelTitle.trim().length > 0) {',
+    '    return client.panelTitle.trim()',
+    '  }',
+    '  return id',
+    '}',
+    '',
+    'function listed(patchText, pluginsDir) {',
+    '  const plugins = []',
+    '  let desktop = null',
+    '  for (const block of loaderRowBlocks(patchText.split(/\\n/))) {',
+    '    const kind = railKind(block.id, pluginsDir)',
+    '    if (kind === undefined) continue',
+    '    const inserted = block.disabledLine === undefined',
+    '    const item = {',
+    '      id: block.id,',
+    '      title: titleOf(block.id, pluginsDir),',
+    '      hidden: false,',
+    '      inserted,',
+    '      occupants: [block.id],',
+    '      kind,',
+    '    }',
+    "    if (kind === 'desktop' && inserted && desktop === null) {",
+    '      desktop = item',
+    '      continue',
+    '    }',
+    '    plugins.push(item)',
+    '  }',
+    '  return { desktop, plugins }',
+    '}',
+    '',
+    'function listedFromDisk(patchPath, pluginsDir) {',
+    '  try {',
+    '    return listed(readFileSync(patchPath, \'utf8\'), pluginsDir)',
+    '  } catch (error) {',
+    '    if (isMissing(error)) return { desktop: null, plugins: [] }',
+    '    throw error',
+    '  }',
+    '}',
+    '',
+    'function setOneInserted(text, id, inserted) {',
+    '  const lines = text.split(/\\n/)',
+    '  const block = loaderRowBlocks(lines).find(item => item.id === id)',
+    '  if (block === undefined) {',
+    "    throw new Error('overlay-plugins: ' + JSON.stringify(id) + ' is not in the live patch')",
+    '  }',
+    '  if (inserted) {',
+    '    if (block.disabledLine === undefined) return text.endsWith(\'\\n\') ? text : text + \'\\n\'',
+    '    const next = lines.filter((_, index) => index !== block.disabledLine).join(\'\\n\')',
+    "    return next.endsWith('\\n') ? next : next + '\\n'",
+    '  }',
+    "  if (block.disabledLine !== undefined) return text.endsWith('\\n') ? text : text + '\\n'",
+    '  const insertAt = block.endLine + 1',
+    "  const disabled = block.keyIndent + 'disabled: true'",
+    '  const next = [...lines.slice(0, insertAt), disabled, ...lines.slice(insertAt)].join(\'\\n\')',
+    "  return next.endsWith('\\n') ? next : next + '\\n'",
+    '}',
+    '',
+    'function exclusiveDesktop(text, pluginsDir, id) {',
+    "  if (railKind(id, pluginsDir) !== 'desktop') {",
+    "    throw new Error('overlay-plugins: ' + JSON.stringify(id) + ' is not a desktop occupant')",
+    '  }',
+    '  let next = text',
+    '  for (const block of loaderRowBlocks(next.split(/\\n/))) {',
+    "    if (railKind(block.id, pluginsDir) !== 'desktop') continue",
+    '    next = setOneInserted(next, block.id, block.id === id)',
+    '  }',
+    '  return next',
+    '}',
+    '',
+    'function setInserted(text, pluginsDir, id, inserted) {',
+    '  const kind = railKind(id, pluginsDir)',
+    '  if (kind === undefined) {',
+    "    throw new Error('overlay-plugins: ' + JSON.stringify(id) + ' is not a rail overlay plugin')",
+    '  }',
+    "  if (kind === 'desktop' && inserted) return exclusiveDesktop(text, pluginsDir, id)",
+    '  return setOneInserted(text, id, inserted)',
+    '}',
+    '',
+    'function badRequest(message) {',
+    '  return {',
+    '    ok: false,',
+    "    error: { code: 'bad-request', message, details: { issues: [] } },",
+    '  }',
+    '}',
+    '',
+    'export function apply(ctx) {',
+    '  try {',
+    '    ctx.connection.rpc.handle(CHANNEL, (endpoint, payload) => {',
+    '      const root = dirname(fileURLToPath(import.meta.url))',
+    "      const patchPath = join(root, 'cordis.patch.yml')",
+    "      const pluginsDir = join(root, 'plugins')",
+    '      if (endpoint === LIST) {',
+    '        return { ok: true, value: listedFromDisk(patchPath, pluginsDir) }',
+    '      }',
+    '      if (endpoint === SET_INSERTED) {',
+    '        if (payload === null || typeof payload !== \'object\' || Array.isArray(payload)) {',
+    "          return badRequest('overlay-plugins: plugins.setInserted needs { id, inserted }')",
+    '        }',
+    '        if (typeof payload.id !== \'string\' || typeof payload.inserted !== \'boolean\') {',
+    "          return badRequest('overlay-plugins: plugins.setInserted needs { id, inserted }')",
+    '        }',
+    '        try {',
+    '          writeFileSync(',
+    '            patchPath,',
+    '            setInserted(readFileSync(patchPath, \'utf8\'), pluginsDir, payload.id, payload.inserted),',
+    '          )',
+    '        } catch (error) {',
+    "          return badRequest(error instanceof Error ? error.message : 'overlay-plugins: setInserted failed')",
+    '        }',
+    '        return { ok: true, value: listedFromDisk(patchPath, pluginsDir) }',
+    '      }',
+    '      if (endpoint === SWITCH_DESKTOP) {',
+    '        if (payload === null || typeof payload !== \'object\' || Array.isArray(payload)) {',
+    "          return badRequest('overlay-plugins: plugins.switchDesktop needs { id }')",
+    '        }',
+    '        if (typeof payload.id !== \'string\' || payload.id.length === 0) {',
+    "          return badRequest('overlay-plugins: plugins.switchDesktop needs { id }')",
+    '        }',
+    '        try {',
+    '          writeFileSync(',
+    '            patchPath,',
+    '            exclusiveDesktop(readFileSync(patchPath, \'utf8\'), pluginsDir, payload.id),',
+    '          )',
+    '        } catch (error) {',
+    "          return badRequest(error instanceof Error ? error.message : 'overlay-plugins: switchDesktop failed')",
+    '        }',
+    '        return { ok: true, value: listedFromDisk(patchPath, pluginsDir) }',
+    '      }',
+    "      return badRequest('unknown overlay-plugins endpoint ' + endpoint)",
+    "    }, { authority: 'trusted-host' })",
+    '  } catch (error) {',
+    "    if (error instanceof Error && error.message.includes('duplicate')) return",
+    '    throw error',
+    '  }',
+    '}',
+    '',
+  ].join('\n')
+}
+
 async function bindOverlayCardOccupant(
   profileRoot: string,
   patchPath: string,
   source: CheckoutManifest & { name: string },
   loaderId: string,
 ): Promise<void> {
-  if (source.name === OVERLAY_CARD_PACKAGE_NAME) return
+  if (source.name === OVERLAY_CARD_PACKAGE_NAME || source.name === OVERLAY_DESKTOP_PACKAGE_NAME) return
   const body = overlayBodyFromClient(source.dsh?.client)
   if (body === undefined) return
+  if (body === OVERLAY_DESKTOP_BODY_SLOT) {
+    await bindOverlayDesktopOccupant(profileRoot, patchPath, loaderId)
+    return
+  }
   const seat = overlayCardSeatFromBodySlot(body)
   if (seat === undefined) {
     throw new Error(
-      `overlay-live-plugin: dsh.client.overlayBody ${JSON.stringify(body)} must be overlay-card.body or overlay-card-N.body`,
+      `overlay-live-plugin: dsh.client.overlayBody ${JSON.stringify(body)} must be overlay-card.body, overlay-card-N.body, or overlay-desktop.body`,
     )
   }
   const patch = parseProfilePatch(await readFile(patchPath, 'utf8'))
@@ -939,6 +1858,20 @@ async function bindOverlayCardOccupant(
   const dest = join(profileRoot, 'plugins', desk.id)
   const next = appendOverlayCardOccupant(await readOverlayCardInstances(dest), seat, loaderId)
   await writeFile(join(dest, OVERLAY_CARD_INSTANCES_FILE), formatOverlayCardInstances(next))
+}
+
+async function bindOverlayDesktopOccupant(
+  profileRoot: string,
+  patchPath: string,
+  loaderId: string,
+): Promise<void> {
+  const patch = parseProfilePatch(await readFile(patchPath, 'utf8'))
+  if (findInsertRowByName(patch.entries, OVERLAY_DESKTOP_PACKAGE_NAME) === undefined) {
+    throw new Error('overlay-live-plugin: overlay desktop plugin is not loaded')
+  }
+  const pluginsDir = join(profileRoot, 'plugins')
+  const next = setDesktopOccupantExclusive(await readFile(patchPath, 'utf8'), pluginsDir, loaderId)
+  await writeFile(patchPath, next)
 }
 
 function overlayBodyFromClient(client: unknown): string | undefined {
@@ -1121,6 +2054,11 @@ if (invokedDirectly) {
     repoRoot,
     workspaceInstall: installWorkspace,
     refreshCatalogs: refreshDerivedCatalogs,
+    build: defaultOverlayCheckoutBuild,
+    waitForClientRow: (packageName, wait) => confirmLiveClientBoot(packageName, {
+      liveManifestPath: wait.liveManifestPath,
+      remountFiber: () => remountInsertRow(wait.patchPath, wait.loaderId),
+    }),
   }).then((message) => {
     process.stdout.write(`${message}\n`)
   }).catch((error: unknown) => {

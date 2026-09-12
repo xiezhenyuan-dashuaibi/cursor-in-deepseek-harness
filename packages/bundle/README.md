@@ -10,6 +10,6 @@ Profile bundles: npm packages whose manifest declares `"dsh": { "bundle": { "pat
 | [`web-app/`](web-app/README.md) | Browser surface: web patch layer + runtime glue plugin | mounts rows |
 | [`headless/`](headless/README.md) | Direct one-shot task mode over base, with no Host or Web layer | mounts `headless-runner` |
 
-[`@deepseek-ai/dsh-cursor-mcp-server`](../cursor/mcp-server/README.md) is also a profile bundle (`cursor-mcp`: base + that package). It lives in `cursor/` because it is Cursor-facing.
+[`@deepseek-ai/dsh-cursor-mcp-server`](../cursor/mcp-server/README.md) is also a profile bundle (`cursor-mcp`: base + that package). The web-app patch loads the same plugin so overlay CLIs attach to Host `/cursor-mcp`. It lives in `cursor/` because it is Cursor-facing.
 
 In-box bundles resolve from the dsh installation; out-of-tree bundles install into a profile through `dsh plugin --profile <name> add <package>`.

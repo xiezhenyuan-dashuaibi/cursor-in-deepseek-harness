@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-cursor-mcp-server",
-  "description": "stdio MCP server that exposes DeepSeek Harness extra tools to Cursor",
+  "description": "stdio or Host Streamable HTTP MCP server that exposes DeepSeek Harness extra tools to Cursor",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"
@@ -63,6 +63,7 @@
     "@deepseek-ai/dsh-agent-default-model": "workspace:^",
     "@deepseek-ai/dsh-agent-loop": "workspace:^",
     "@deepseek-ai/dsh-agent-loop-testkit": "workspace:^",
+    "@deepseek-ai/dsh-host-webserver": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",

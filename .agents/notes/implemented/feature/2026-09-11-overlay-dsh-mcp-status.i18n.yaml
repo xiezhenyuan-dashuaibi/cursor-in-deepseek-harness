@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-11-overlay-dsh-mcp-status.md
+2026-09-11-overlay-dsh-mcp-status.md: 6c83b19252a787aa26a0203318892dcbc84b4762
+2026-09-11-overlay-dsh-mcp-status.zh.md: 6ba1f893ae4ac6bb678224cd1aecf38d9946c259

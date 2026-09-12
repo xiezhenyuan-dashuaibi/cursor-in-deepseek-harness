@@ -2,7 +2,8 @@
  * Cursor-facing MCP server plugin: stdio JSON-RPC, filtered `dsh_*` tools,
  * and `dsh_system_prompt` / initialize instructions from mcp-prompt.
  *
- * Namespace plugin (named exports, no default export). Stdout is MCP JSON-RPC.
+ * Namespace plugin (named exports, no default export). Stdio profile: stdout is
+ * MCP JSON-RPC. Web Host: Streamable HTTP on `/cursor-mcp`.
  *
  * @module @deepseek-ai/dsh-cursor-mcp-server
  */
@@ -17,6 +18,10 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 // Empty type import carries the loader Context merge for the settlement await.
 import type {} from '@deepseek-ai/cordis-plugin-loader'
 import { createOwnerAgent } from './owner.ts'
+import {
+  connectHttpMcp,
+  isWebServerLike,
+} from './http.ts'
 import { connectMcpServer } from './server.ts'
 
 export {
@@ -34,6 +39,13 @@ export {
 } from './execute.ts'
 export { createOwnerAgent } from './owner.ts'
 export { connectMcpServer, MCP_SERVER_NAME } from './server.ts'
+export {
+  CURSOR_DSH_MCP_URL_ENV,
+  CURSOR_MCP_HTTP_PATH,
+  cursorMcpAttachUrl,
+  isLoopbackMcpRequest,
+  isWebServerLike,
+} from './http.ts'
 export { resolveMcpSkillCatalog } from './skill-catalog.ts'
 export type { ConnectMcpServerOptions, McpServerSession } from './server.ts'
 export type { McpCallInput } from './execute.ts'
@@ -76,6 +88,11 @@ export const internals: { createTransport(): Transport } = {
  * @returns after the MCP transport is connected.
  */
 async function connectOwner(ctx: Context, config: Config): Promise<void> {
+  const web = ctx.get('webServer')
+  if (isWebServerLike(web)) {
+    await connectHttpMcp(ctx, web, config, MCP_SERVER_VERSION)
+    return
+  }
   const handle = await createOwnerAgent(ctx, config)
   try {
     const session = await connectMcpServer(ctx, {

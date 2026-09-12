@@ -14,7 +14,7 @@ Cursor is the coding agent. Extra DeepSeek Harness tools (skill, workflow, Ralph
 
 MCP `serverInfo.name` is `dsh`. Wire names stay `dsh_*`; Cursor may prefix (`mcp__dsh__dsh_skill`). The DSH subagent control plane is omitted from this catalog; [the control-plane omit note](../architecture/2026-09-04-mcp-omit-dsh-subagent-control-plane.md) owns that filter. Workflow and Ralph are omitted because their children call the DSH LLM; [the LLM-child omit note](../architecture/2026-09-04-mcp-omit-dsh-llm-child-tools.md) owns that filter. File/shell/search/todo/ask-user/web/plan/goal clones are omitted and refused even if still registered.
 
-The web overlay still boots `--profile web`. Cursor CLI and the IDE read [`.cursor/mcp.json`](../../../../.cursor/mcp.json), which launches [`bin/stdio.mjs`](../../../../packages/cursor/mcp-server/bin/stdio.mjs) so the child always chdirs to the workspace root before `dsh --profile cursor-mcp`. That child is not the web GUI process.
+The web overlay still boots `--profile web`. Cursor CLI and the IDE read [`.cursor/mcp.json`](../../../../.cursor/mcp.json), which launches [`bin/stdio.mjs`](../../../../packages/cursor/mcp-server/bin/stdio.mjs) so the child always chdirs to the workspace root before `dsh --profile cursor-mcp`. That child does not own the web GUI stdout. When the overlay gateway sets `CURSOR_DSH_MCP_URL`, that stdio process attaches to the web Host `/cursor-mcp` instead of booting `cursor-mcp` ([overlay shared web MCP](2026-09-12-overlay-shared-web-mcp.md)).
 
 ## Alternatives considered
 
@@ -22,7 +22,7 @@ The web overlay still boots `--profile web`. Cursor CLI and the IDE read [`.curs
 
 **Allow-list `MCP_TOOL_NAMES` only.** Rejected — the locked contract filters the omit list so a new extra tool appears without editing the server.
 
-**Serve MCP from the web process.** Rejected — MCP owns stdout; the web GUI already uses HTTP. A second composition keeps the overlay TUI and the stdio server from sharing a stream.
+**Serve MCP JSON-RPC on the web process stdout.** Rejected — MCP owns stdout; the web GUI already uses HTTP. A second composition keeps the overlay TUI and the stdio server from sharing a stream. Overlay CLIs share extras over Streamable HTTP on `/cursor-mcp` instead ([overlay shared web MCP](2026-09-12-overlay-shared-web-mcp.md)).
 
 **Put the package in `packages/mcp/`.** Rejected — this server is Cursor-facing (name prefix, overlay `mcp.json`, omit list vs Cursor tools). `mcp-client` remains the generic bridge the other direction.
 
@@ -32,8 +32,8 @@ The web overlay still boots `--profile web`. Cursor CLI and the IDE read [`.curs
 
 ## Consequences
 
-When a Loader is present, plugin `apply` returns before `loader.await()` so this fiber does not deadlock waiting on its own settlement; MCP connects after the rest of `dsh-base` is up. The IDE Agent can list and call extra DSH tools once `.cursor/mcp.json` is present and Settings → Tools & MCP has `dsh` enabled; an IDE chat that started before the server mounted keeps an empty catalog until a new chat (or a toggle / full Cursor restart). The web overlay spawns the official CLI with `--approve-mcps --trust` so the TUI session loads project `dsh` without a per-session approval prompt; `agent mcp enable dsh` still adds the server to the local approved list. Overlay Cursor CLI still needs `agent login`. Extra-tool execute does not show in the web session. Approval `ask` has no widget on stdio. Native `assemble()` is unchanged. The prompt package remains the owner of the projection markdown.
+When a Loader is present, plugin `apply` returns before `loader.await()` so this fiber does not deadlock waiting on its own settlement; MCP connects after the rest of `dsh-base` is up. Overlay CLI and the desktop IDE each spawn their own stdio child from `.cursor/mcp.json`. Overlay uses `--approve-mcps --trust`; desktop Settings → Tools & MCP toggles only the desktop IDE client and does not mount extras on overlay Cursor. `agent mcp enable dsh` still adds the server to the local approved list. Overlay Cursor CLI still needs `agent login`. Extra-tool execute does not show in the web session transcript. Approval `ask` has no widget on stdio. Native `assemble()` is unchanged. The prompt package remains the owner of the projection markdown.
 
 ## Testing
 
-Package tests cover Loader `unwrapExports` (no default export), the invariant companion, omit-list catalog plus `dsh_system_prompt`, InMemory MCP initialize/list/call/`listChanged`, omitted `dsh_read` without execute, JSON argument coercion, content-block mapping, owner Agent create/dispose, `apply` connect-failure rollback, and live skill-catalog disclosure (including last-good on incomplete snapshot).
+Package tests cover Loader `unwrapExports` (no default export), the invariant companion, omit-list catalog plus `dsh_system_prompt`, InMemory MCP initialize/list/call/`listChanged`, omitted `dsh_read` without execute, JSON argument coercion, content-block mapping, owner Agent create/dispose, `apply` connect-failure rollback, and live skill-catalog disclosure (including last-good on incomplete snapshot). Host Streamable HTTP attach coverage lives on [overlay shared web MCP](2026-09-12-overlay-shared-web-mcp.md).

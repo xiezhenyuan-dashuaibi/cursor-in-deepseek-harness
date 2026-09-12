@@ -4,7 +4,7 @@
 
 面向 web 聊天浮层的 WebSocket 网关。插件在 `ctx.webServer` 上注册精确升级路径 `/cursor-agent`。一个 overlay 会话键（该路径上的 `?session=`，或新铸的 UUID）拥有长驻交互式 Cursor CLI PTY（去掉 headless 的 `--print` / `--force`），用于 slash 菜单与其它输入行下方选项面；每条聊天 `{op:"prompt"}` 另起 headless `--print --output-format stream-json` 子进程（首次拿到 `session_id` 后带 `--resume`）。WebSocket 是可替换的查看者：关闭只卸下查看者；`{op:"shutdown"}` 或插件销毁才停下 CLI。
 
-`{op:"keys",data}` 写入交互 PTY。每次屏幕更新时网关发布 `{op:"mirror",input,below}`，用于灰色输入栏及其下方行。失败回合横幅（`Error: [aborted] …`、`ECONNRESET`）是状态 chrome：既不是 `input`，也不是选项行。对话 transcript 只来自 headless NDJSON 的 `{op:"event"}`——从不把 PTY 屏幕摘取成助手文本。忙碌 follow-up 使用 `{op:"prompt",mode:"queue"}`（退出时 FIFO 排空）与 `{op:"followup_cancel"}`（LIFO 弹出）；`mode:"steer"` 杀掉当前子进程并开 resume 回合。`{op:"interrupt"}` 杀掉 headless 子进程并向 PTY 发 Ctrl+C；`{op:"reset"}` 清空 resume id 与队列。新查看者在实时帧之前收到 `{op:"snapshot"}`（`status`、`events`、`followUps`、`cursorSessionId`、`mirror`）。当 spawn cwd 是本 DeepSeek Harness checkout 时，headless 回合通过 Node `--import` 与 `NODE_OPTIONS` 注入 `fence/preload.mjs`。
+`{op:"keys",data}` 写入交互 PTY。每次屏幕更新时网关发布 `{op:"mirror",input,below}`，用于灰色输入栏及其下方行。失败回合横幅（`Error: [aborted] …`、`ECONNRESET`）是状态 chrome：既不是 `input`，也不是选项行。对话 transcript 只来自 headless NDJSON 的 `{op:"event"}`——从不把 PTY 屏幕摘取成助手文本。忙碌 follow-up 使用 `{op:"prompt",mode:"queue"}`（退出时 FIFO 排空）与 `{op:"followup_cancel"}`（LIFO 弹出）；`mode:"steer"` 杀掉当前子进程并开 resume 回合。`{op:"interrupt"}` 杀掉 headless 子进程并向 PTY 发 Ctrl+C；`{op:"reset"}` 清空 resume id 与队列。新查看者在实时帧之前收到 `{op:"snapshot"}`（`status`、`events`、`followUps`、`cursorSessionId`、`mirror`、`dshMcp`）。运行时对同一套 CLI argv 再 spawn `mcp list-tools dsh`，把项目 `dsh` 是否 ready 发成 `{op:"dsh_mcp",status}`，overlay 面板在 Cursor 标记右侧显示。overlay CLI 子进程继承指向本 Host `/cursor-mcp` 的 `CURSOR_DSH_MCP_URL`，因此 [`bin/stdio.mjs`](../mcp-server/bin/stdio.mjs) 会挂上该路由，而不再启动 `cursor-mcp`。当 spawn cwd 是本 DeepSeek Harness checkout 时，headless 回合通过 Node `--import` 与 `NODE_OPTIONS` 注入 `fence/preload.mjs`。
 
 当启用 `logConversations`（默认）时，每个 overlay 会话键在 `{cwd}/.cursor/dsh-logs/conversations/{yyyy-mm-dd}/{session-id}.jsonl` 下追加结构化 JSONL。Host/Origin 栅栏是连接插件的 `isTrustedApiRequest`。
 
@@ -26,3 +26,4 @@
 - **屏幕缓冲使用 xterm 延迟换行** — 整行写满后再跟 CRLF 不得跳行，否则滚动 slash 菜单会留下重复项。
 - **Cursor IDE `agent-transcripts` 是另一产品** — 本日志只服务 `dsh web` overlay 会话。
 - **Cursor CLI 的寿命长于查看套接字** — 标签页掉线会重连；`{op:"shutdown"}` 或插件销毁才停下 CLI。宿主重启会丢掉所有 runtime。
+- **`dshMcp` 来自 `mcp list-tools dsh`，不是已冻结的 `--print` 目录** — overlay chrome 显示新的 CLI spawn 能否列出项目 `dsh` ready。overlay 子进程继承 `CURSOR_DSH_MCP_URL`，因此那次列出可以挂到本 Host 的 `/cursor-mcp`。未能判定 `dsh` 的挂起保持启动中。已经在没有这些工具的情况下开始的回合仍然是空目录。用户 Cursor 配置里的其它 MCP 服务器仍属于 Cursor 的客户端。

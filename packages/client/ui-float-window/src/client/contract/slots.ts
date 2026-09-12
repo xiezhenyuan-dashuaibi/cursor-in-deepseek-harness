@@ -40,89 +40,36 @@ export {}
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
     /**
-     * Body of the movable overlay card. Occupied by a page plugin.
+     * Body of overlay card seat 1. Occupied by a page plugin.
      * The page is a designed webpage; call `preferFrame` on mount for opening size.
+     * Later seats are `overlay-card-N.body` for N ≥ 2 (same owner share).
      * Declared by `overlay-card`; do not occupy `root` or `cursor-agent`.
      */
     'overlay-card.body': { kind: 'single'; scope: 'root'; owner: OverlayCardBodyOwner }
     /**
-     * Body of overlay card seat 2. Same owner share as `overlay-card.body`.
-     * Exists while that numbered card is mounted.
+     * Body of overlay card seat N for N ≥ 2 (`overlay-card-2.body`, `overlay-card-10.body`, …).
+     * Same owner share as `overlay-card.body`. OverlayDesk declares the key when
+     * that seat is inside the current predeclared block.
      */
-    'overlay-card-2.body': { kind: 'single'; scope: 'root'; owner: OverlayCardBodyOwner }
-    /**
-     * Body of overlay card seat 3. Same owner share as `overlay-card.body`.
-     * Exists while that numbered card is mounted.
-     */
-    'overlay-card-3.body': { kind: 'single'; scope: 'root'; owner: OverlayCardBodyOwner }
-    /**
-     * Body of overlay card seat 4. Same owner share as `overlay-card.body`.
-     * Exists while that numbered card is mounted.
-     */
-    'overlay-card-4.body': { kind: 'single'; scope: 'root'; owner: OverlayCardBodyOwner }
-    /**
-     * Body of overlay card seat 5. Same owner share as `overlay-card.body`.
-     * Exists while that numbered card is mounted.
-     */
-    'overlay-card-5.body': { kind: 'single'; scope: 'root'; owner: OverlayCardBodyOwner }
-    /**
-     * Body of overlay card seat 6. Same owner share as `overlay-card.body`.
-     * Exists while that numbered card is mounted.
-     */
-    'overlay-card-6.body': { kind: 'single'; scope: 'root'; owner: OverlayCardBodyOwner }
-    /**
-     * Body of overlay card seat 7. Same owner share as `overlay-card.body`.
-     * Exists while that numbered card is mounted.
-     */
-    'overlay-card-7.body': { kind: 'single'; scope: 'root'; owner: OverlayCardBodyOwner }
-    /**
-     * Body of overlay card seat 8. Same owner share as `overlay-card.body`.
-     * Exists while that numbered card is mounted.
-     */
-    'overlay-card-8.body': { kind: 'single'; scope: 'root'; owner: OverlayCardBodyOwner }
+    [key: `overlay-card-${number}.body`]: { kind: 'single'; scope: 'root'; owner: OverlayCardBodyOwner }
     /**
      * Extra trailing controls on the default compact title bar.
      * Built-in 缩小 is chrome on OverlayCard, not this slot.
      * Pointer events here do not start a card drag; they still raise the window.
      * Absent occupants leave the region blank. A tall branded title bar is an
      * edit of OverlayCard, not this slot. Declared by `overlay-card`.
+     * Later seats are `overlay-card-N.chrome.trailing` for N ≥ 2.
      */
     'overlay-card.chrome.trailing': { kind: 'list'; scope: 'root'; owner: OverlayCardChromeTrailingOwner }
     /**
-     * Trailing chrome list of overlay card seat 2. Same contract as
-     * `overlay-card.chrome.trailing`. Exists while that numbered card is mounted.
+     * Trailing chrome list of overlay card seat N for N ≥ 2.
+     * Same contract as `overlay-card.chrome.trailing`.
      */
-    'overlay-card-2.chrome.trailing': { kind: 'list'; scope: 'root'; owner: OverlayCardChromeTrailingOwner }
-    /**
-     * Trailing chrome list of overlay card seat 3. Same contract as
-     * `overlay-card.chrome.trailing`. Exists while that numbered card is mounted.
-     */
-    'overlay-card-3.chrome.trailing': { kind: 'list'; scope: 'root'; owner: OverlayCardChromeTrailingOwner }
-    /**
-     * Trailing chrome list of overlay card seat 4. Same contract as
-     * `overlay-card.chrome.trailing`. Exists while that numbered card is mounted.
-     */
-    'overlay-card-4.chrome.trailing': { kind: 'list'; scope: 'root'; owner: OverlayCardChromeTrailingOwner }
-    /**
-     * Trailing chrome list of overlay card seat 5. Same contract as
-     * `overlay-card.chrome.trailing`. Exists while that numbered card is mounted.
-     */
-    'overlay-card-5.chrome.trailing': { kind: 'list'; scope: 'root'; owner: OverlayCardChromeTrailingOwner }
-    /**
-     * Trailing chrome list of overlay card seat 6. Same contract as
-     * `overlay-card.chrome.trailing`. Exists while that numbered card is mounted.
-     */
-    'overlay-card-6.chrome.trailing': { kind: 'list'; scope: 'root'; owner: OverlayCardChromeTrailingOwner }
-    /**
-     * Trailing chrome list of overlay card seat 7. Same contract as
-     * `overlay-card.chrome.trailing`. Exists while that numbered card is mounted.
-     */
-    'overlay-card-7.chrome.trailing': { kind: 'list'; scope: 'root'; owner: OverlayCardChromeTrailingOwner }
-    /**
-     * Trailing chrome list of overlay card seat 8. Same contract as
-     * `overlay-card.chrome.trailing`. Exists while that numbered card is mounted.
-     */
-    'overlay-card-8.chrome.trailing': { kind: 'list'; scope: 'root'; owner: OverlayCardChromeTrailingOwner }
+    [key: `overlay-card-${number}.chrome.trailing`]: {
+      kind: 'list'
+      scope: 'root'
+      owner: OverlayCardChromeTrailingOwner
+    }
   }
 }
 

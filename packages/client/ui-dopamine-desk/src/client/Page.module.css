@@ -1,0 +1,188 @@
+.scene {
+  --pulse-ink: #fff7fb;
+  --pulse-glow: #ff4fd8;
+  --pulse-cyan: #3df0ff;
+  --pulse-lemon: #ffe14a;
+  --pulse-void: #0a0014;
+  position: relative;
+  display: block;
+  flex: 1;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--pulse-ink);
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 110%, color-mix(in srgb, var(--pulse-glow) 45%, transparent), transparent 58%),
+    radial-gradient(ellipse 40% 40% at 8% 18%, color-mix(in srgb, var(--pulse-cyan) 40%, transparent), transparent 62%),
+    radial-gradient(ellipse 45% 35% at 92% 22%, color-mix(in srgb, var(--pulse-lemon) 28%, transparent), transparent 60%),
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--pulse-cyan) 10%, transparent) 0 1px,
+      transparent 1px 72px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--pulse-glow) 12%, transparent) 0 1px,
+      transparent 1px 72px
+    ),
+    linear-gradient(180deg, #1c0030 0%, var(--pulse-void) 48%, #00141c 100%);
+}
+
+.orbA,
+.orbB,
+.orbC {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+.orbA {
+  top: 18%;
+  right: 22%;
+  width: 28vmin;
+  height: 28vmin;
+  background: radial-gradient(circle at 30% 30%, var(--pulse-cyan), transparent 68%);
+  opacity: 0.55;
+  animation: drift 14s ease-in-out infinite;
+}
+
+.orbB {
+  bottom: 12%;
+  left: 8%;
+  width: 36vmin;
+  height: 36vmin;
+  background: radial-gradient(circle at 40% 40%, var(--pulse-glow), transparent 70%);
+  opacity: 0.45;
+  animation: drift 18s ease-in-out infinite reverse;
+}
+
+.orbC {
+  top: 42%;
+  left: 48%;
+  width: 18vmin;
+  height: 18vmin;
+  background: radial-gradient(circle at 50% 50%, var(--pulse-lemon), transparent 72%);
+  opacity: 0.35;
+  animation: drift 11s ease-in-out infinite;
+}
+
+.mast {
+  position: absolute;
+  top: 8%;
+  left: 6%;
+  right: 28%;
+  z-index: 1;
+  max-width: 18em;
+  pointer-events: none;
+}
+
+.kicker {
+  margin: 0 0 8px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--pulse-cyan);
+  font: var(--dsw-font-xxs-strong-12);
+}
+
+.title {
+  margin: 0;
+  font: var(--dsw-font-xl-strong-28);
+  text-shadow: 0 0 28px color-mix(in srgb, var(--pulse-glow) 90%, transparent);
+}
+
+.body {
+  margin: 12px 0 0;
+  color: color-mix(in srgb, var(--pulse-ink) 78%, var(--pulse-cyan));
+  font: var(--dsw-font-m-16);
+}
+
+.meter {
+  position: absolute;
+  top: 8%;
+  right: 7%;
+  z-index: 1;
+  margin: 0;
+  pointer-events: none;
+  font: var(--dsw-font-xl-strong-28);
+  color: var(--pulse-lemon);
+  text-shadow: 0 0 24px color-mix(in srgb, var(--pulse-lemon) 80%, transparent);
+}
+
+.pad {
+  position: absolute;
+  z-index: 2;
+  margin: 0;
+  padding: 0;
+  width: 18vmin;
+  height: 18vmin;
+  min-width: 96px;
+  min-height: 96px;
+  border: 0;
+  border-radius: 50%;
+  pointer-events: auto;
+  color: #140018;
+  font: var(--dsw-font-s-strong-14);
+  cursor: pointer;
+  box-shadow:
+    0 0 0 10px color-mix(in srgb, white 12%, transparent),
+    0 0 40px color-mix(in srgb, var(--pulse-glow) 55%, transparent);
+}
+
+.padA {
+  left: 18%;
+  bottom: 22%;
+  background: radial-gradient(circle at 35% 30%, #fff2a8, var(--pulse-lemon) 42%, #ff6ad6);
+}
+
+.padB {
+  left: 46%;
+  bottom: 14%;
+  background: radial-gradient(circle at 35% 30%, #eaffff, var(--pulse-cyan) 40%, #7a5cff);
+}
+
+.padC {
+  right: 16%;
+  bottom: 28%;
+  background: radial-gradient(circle at 35% 30%, #ffe8ff, var(--pulse-glow) 38%, #ff8a3c);
+}
+
+.pad:hover {
+  transform: scale(1.06);
+}
+
+.pad:focus-visible {
+  outline: 3px solid var(--pulse-cyan);
+  outline-offset: 6px;
+}
+
+.padFlash {
+  animation: pulse-pop 320ms var(--ds-ease-in-out);
+}
+
+@keyframes pulse-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(4vmin, -3vmin); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orbA,
+  .orbB,
+  .orbC,
+  .padFlash {
+    animation: none;
+  }
+
+  .pad:hover {
+    transform: none;
+  }
+}

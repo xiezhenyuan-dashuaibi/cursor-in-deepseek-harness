@@ -430,6 +430,22 @@ export interface Config {
 
 来源：[`packages/client/hmr/src/index.ts:33`](../packages/client/hmr/src/index.ts)
 
+<a id="deepseek-aidsh-client-ui-cursor-agent"></a>
+
+## `@deepseek-ai/dsh-client-ui-cursor-agent`
+
+```ts config-catalog
+/** Test overrides for the live profile paths. */
+export interface OverlayPluginRosterOptions {
+  /** Absolute `cordis.patch.yml`. */
+  patchPath?: string
+  /** Absolute `plugins/` directory. */
+  pluginsDir?: string
+}
+```
+
+来源：[`packages/client/ui-cursor-agent/src/plugin-roster.ts:91`](../packages/client/ui-cursor-agent/src/plugin-roster.ts)
+
 <a id="deepseek-aidsh-client-ui-float-window"></a>
 
 ## `@deepseek-ai/dsh-client-ui-float-window`
@@ -441,10 +457,12 @@ export interface Config {
 export interface OverlayCardHostOptions {
   /** Absolute directory containing `instances.json`. */
   instancesDir?: string
+  /** Absolute `cordis.patch.yml`. Tests pass a temp file. */
+  patchPath?: string
 }
 ```
 
-来源：[`packages/client/ui-float-window/src/index.ts:35`](../packages/client/ui-float-window/src/index.ts)
+来源：[`packages/client/ui-float-window/src/index.ts:61`](../packages/client/ui-float-window/src/index.ts)
 
 <a id="deepseek-aidsh-code-runtime-worker-thread"></a>
 
@@ -628,7 +646,7 @@ export interface CursorAgentGatewayConfig {
 }
 ```
 
-来源：[`packages/cursor/agent-gateway/src/index.ts:45`](../packages/cursor/agent-gateway/src/index.ts)
+来源：[`packages/cursor/agent-gateway/src/index.ts:78`](../packages/cursor/agent-gateway/src/index.ts)
 
 <a id="deepseek-aidsh-cursor-mcp-server"></a>
 
@@ -3111,11 +3129,9 @@ export interface Config {
 - `@deepseek-ai/dsh-client-modules` — 需要 `webServer` · `loader`（[`packages/client/modules/src/index.ts`](../packages/client/modules/src/index.ts)）
 - `@deepseek-ai/dsh-client-runtime`（[`packages/client/runtime/src/index.ts`](../packages/client/runtime/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-agent-preset`（[`packages/client/ui-agent-preset/src/index.ts`](../packages/client/ui-agent-preset/src/index.ts)）
-- `@deepseek-ai/dsh-client-ui-barber`（[`packages/client/ui-barber/src/index.ts`](../packages/client/ui-barber/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-commands`（[`packages/client/ui-commands/src/index.ts`](../packages/client/ui-commands/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-conversation`（[`packages/client/ui-conversation/src/index.ts`](../packages/client/ui-conversation/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-cordis`（[`packages/extensions/ui-cordis/src/index.ts`](../packages/extensions/ui-cordis/src/index.ts)）
-- `@deepseek-ai/dsh-client-ui-cursor-agent`（[`packages/client/ui-cursor-agent/src/index.ts`](../packages/client/ui-cursor-agent/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-deliverables` — 需要 `systemPrompt`（[`packages/client/ui-deliverables/src/index.ts`](../packages/client/ui-deliverables/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-directory-picker-browse`（[`packages/client/ui-directory-picker-browse/src/index.ts`](../packages/client/ui-directory-picker-browse/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-directory-picker-native`（[`packages/client/ui-directory-picker-native/src/index.ts`](../packages/client/ui-directory-picker-native/src/index.ts)）
@@ -3125,6 +3141,7 @@ export interface Config {
 - `@deepseek-ai/dsh-client-ui-layout`（[`packages/client/ui-layout/src/index.ts`](../packages/client/ui-layout/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-message-feedback`（[`packages/client/ui-message-feedback/src/index.ts`](../packages/client/ui-message-feedback/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-model-selection`（[`packages/client/ui-model-selection/src/index.ts`](../packages/client/ui-model-selection/src/index.ts)）
+- `@deepseek-ai/dsh-client-ui-overlay-desktop`（[`packages/client/ui-overlay-desktop/src/index.ts`](../packages/client/ui-overlay-desktop/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-permission-presets`（[`packages/client/ui-permission-presets/src/index.ts`](../packages/client/ui-permission-presets/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-plan`（[`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-settings`（[`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts)）

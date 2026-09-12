@@ -84,7 +84,11 @@ function manifest(spec: PageKitSpec): Record<string, unknown> {
         overlayBody: 'overlay-card.body',
       },
     },
-    scripts: { bundle: 'tsdown', watch: 'tsdown --watch' },
+    scripts: {
+      build: 'tsc --pretty false -p tsconfig.json && tsdown',
+      bundle: 'tsdown',
+      watch: 'tsdown --watch',
+    },
     license: 'MIT',
     dependencies: { react: '^18.2.0' },
     peerDependencies: {
@@ -126,7 +130,7 @@ function tsconfig(): Record<string, unknown> {
       { path: '../../../vendor/cordis' },
       { path: '../locale' },
       { path: '../runtime' },
-      { path: '../ui-float-window' },
+      { path: '../ui-float-window/tsconfig.client.json' },
       { path: '../ui-slots' },
       { path: '../../runtime-diagnostics/invariants' },
     ],
@@ -236,7 +240,7 @@ export const en: Record<OverlayPageKey, string> = {
   'actionDone': 'Continued',
 }
 
-/** Union of this namespace's dictionary keys. */
+/** Union of this namespace's dictionary keys. Keep this export name. */
 export type OverlayPageKey = keyof typeof zh
 `
 }

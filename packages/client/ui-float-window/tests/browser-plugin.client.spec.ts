@@ -64,6 +64,9 @@ describe('ui-float-window browser apply', () => {
     expect(ctx.slots.entries('overlay-card.body')).toHaveLength(0)
     expect(ctx.slots.entries('overlay-card.chrome.trailing')).toHaveLength(0)
     expect(ctx.slots.entries('overlay-card-2.body')).toHaveLength(0)
+    expect(entry.children?.['overlay-card.body']).toEqual({ kind: 'single', scope: 'root' })
+    expect(entry.children?.['overlay-card-8.body']).toEqual({ kind: 'single', scope: 'root' })
+    expect(entry.children?.['overlay-card-9.body']).toBeUndefined()
     const injected = (entry.inject as () => OverlayCardInjected)()
     injected.raiseDesk()
     expect(ctx.get('overlayStack')!.source.getSnapshot().front.at(-1)).toBe('overlay-card')
@@ -76,5 +79,36 @@ describe('ui-float-window browser apply', () => {
     expect(ctx.slots.entries('shell.overlay')).toHaveLength(1)
     await fiber.dispose()
     expect(ctx.slots.entries('shell.overlay')).toHaveLength(0)
+  })
+
+  it('grows predeclared body slots when the roster high-water mark crosses 8', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SlotRegistry).await()
+    ctx.slots.register(
+      { name: 'root', children: { 'shell.overlay': { kind: 'list', scope: 'root' } } } as never,
+      () => null,
+    )
+    ctx.provide('locale', new LocaleRuntime(ctx))
+    ctx.provide('overlayStack', new OverlayStackController())
+    const nine = {
+      cards: Array.from({ length: 9 }, (_, index) => ({
+        seat: index + 1,
+        id: String(index + 1),
+        title: '卡片',
+        width: 360,
+        height: 280,
+        inserted: true,
+      })),
+    }
+    ctx.provide('connection', {
+      rpc: { call: vi.fn(async () => ({ ok: true, value: nine })) },
+    })
+    await ctx.plugin({ inject: [...inject], apply }).await()
+    await vi.waitFor(() => {
+      const desk = ctx.slots.entries('shell.overlay')[0]
+      expect(desk?.children?.['overlay-card-9.body']).toEqual({ kind: 'single', scope: 'root' })
+      expect(desk?.children?.['overlay-card-16.body']).toEqual({ kind: 'single', scope: 'root' })
+      expect(desk?.children?.['overlay-card-17.body']).toBeUndefined()
+    })
   })
 })

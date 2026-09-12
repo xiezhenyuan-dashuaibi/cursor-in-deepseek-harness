@@ -10,6 +10,6 @@ Profile 组合包：在 manifest（元数据清单）中声明 `"dsh": { "bundle
 | [`web-app/`](web-app/README.md) | 浏览器表层：web patch 层 + 运行时粘合插件 | 挂载多条配置行 |
 | [`headless/`](headless/README.md) | 直接运行在 base 之上的一次性任务模式，不含 Host 或 Web 层 | 挂载 `headless-runner` |
 
-[`@deepseek-ai/dsh-cursor-mcp-server`](../cursor/mcp-server/README.md) 也是 profile 组合包（`cursor-mcp`：base + 该包）。它放在 `cursor/`，因为它面向 Cursor。
+[`@deepseek-ai/dsh-cursor-mcp-server`](../cursor/mcp-server/README.md) 也是 profile 组合包（`cursor-mcp`：base + 该包）。web-app patch 加载同一插件，让 overlay CLI 挂到 Host 的 `/cursor-mcp`。它放在 `cursor/`，因为它面向 Cursor。
 
 内置组合包从 dsh 安装目录解析；树外（out-of-tree）组合包通过 `dsh plugin --profile <name> add <package>` 安装进 profile。

@@ -285,7 +285,7 @@ describe('ui-float-window node apply', () => {
     await mkdir(live, { recursive: true })
     await writeFile(join(live, 'package.json'), JSON.stringify({ name: OVERLAY_CARD_PACKAGE_NAME }))
     await writeFile(join(live, 'instances.json'), formatOverlayCardInstances([
-      { seat: 1, id: 'barber', title: '青石', width: 1080, height: 820 },
+      { seat: 1, id: 'draft', title: '草稿', width: 1080, height: 820 },
     ]))
     const checkoutSrc = join(home, 'packages', 'client', 'ui-float-window', 'src')
     await mkdir(checkoutSrc, { recursive: true })

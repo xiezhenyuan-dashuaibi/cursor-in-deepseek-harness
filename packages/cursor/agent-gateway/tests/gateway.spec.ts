@@ -9,6 +9,7 @@ import { PassThrough, Readable } from 'node:stream'
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import { CURSOR_DSH_MCP_URL_ENV, cursorMcpAttachUrl } from '@deepseek-ai/dsh-cursor-mcp-server'
 import WebServer, { type WebUpgradeRoute } from '@deepseek-ai/dsh-host-webserver'
 import WebSocket, { WebSocketServer } from 'ws'
 import {
@@ -277,6 +278,7 @@ describe('cursor-agent-gateway plugin', () => {
       logConversations: true,
     }, (file, args, options) => {
       harness.spawns.push({ file, args, cwd: options.cwd })
+      expect(options.env[CURSOR_DSH_MCP_URL_ENV]).toBe(cursorMcpAttachUrl(ctx.webServer.port))
       return harness.pty
     })
     running.push(async () => { await ctx.fiber.dispose() })
@@ -751,6 +753,47 @@ describe('cursor-agent-gateway plugin', () => {
     await vi.waitFor(() => { expect(headless.spawns.length).toBeGreaterThanOrEqual(2) })
     expect(pty.writes.includes(' ')).toBe(false)
     expect(headless.spawns.at(-1)?.args.some(arg => String(arg).includes('hotpot'))).toBe(true)
+    client.close()
+  })
+
+  it('probes mcp list-tools dsh and publishes dsh_mcp connected', async () => {
+    const pty = createPtyHarness()
+    const mcpChild = new FakeChild()
+    let listArgs: readonly string[] = []
+    let runtime: AgentChatRuntime | undefined
+    const { origin } = await serveChat((websocket) => {
+      if (runtime === undefined) {
+        runtime = attachAgentChat(websocket, {
+          file: 'agent',
+          args: ['--approve-mcps', '--trust'],
+          cwd: '/work',
+          spawnChild: (_file, args, spawnOptions) => {
+            pty.spawns.push({ file: _file, args, cwd: spawnOptions.cwd })
+            return pty.pty
+          },
+          spawnHeadless: createHeadlessHarness().spawn,
+          spawnMcpList: (_file, args) => {
+            listArgs = args
+            return mcpChild as unknown as ChildProcessWithoutNullStreams
+          },
+        })
+        return
+      }
+      runtime.bind(websocket)
+    })
+    running.push(async () => { runtime?.shutdown() })
+    const client = new WebSocket(`${origin}/`)
+    const messages = messagePump(client)
+    await once(client, 'open')
+    expect(await messages.next()).toEqual({ op: 'ready' })
+    expect(await messages.next()).toMatchObject({
+      op: 'snapshot',
+      dshMcp: 'checking',
+    })
+    expect(listArgs).toEqual(expect.arrayContaining(['mcp', 'list-tools', 'dsh']))
+    mcpChild.stdout.write('dsh: ready\n')
+    mcpChild.emitExit(0)
+    expect(await messages.next()).toEqual({ op: 'dsh_mcp', status: 'connected' })
     client.close()
   })
 })

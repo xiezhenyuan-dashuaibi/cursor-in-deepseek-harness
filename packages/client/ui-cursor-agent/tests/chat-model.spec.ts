@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import {
+  coalesceAssistantText,
   countActiveTasks,
   emptyChatFold,
   foldCursorEvent,
@@ -51,6 +52,15 @@ describe('messageText / toolCallName / isAssistantDelta', () => {
     expect(isAssistantDelta({ type: 'assistant', timestamp_ms: 1, model_call_id: 'm' })).toBe(false)
     expect(isAssistantDelta({ type: 'assistant' })).toBe(false)
     expect(isAssistantDelta({ type: 'user', timestamp_ms: 1 })).toBe(false)
+    expect(coalesceAssistantText('', 'Hi')).toBe('Hi')
+    expect(coalesceAssistantText('Hi', '')).toBe('Hi')
+    expect(coalesceAssistantText('Hello', 'Hello')).toBe('Hello')
+    expect(coalesceAssistantText('Hello', 'Hello world')).toBe('Hello world')
+    expect(coalesceAssistantText('Hello world', 'Hello')).toBe('Hello world')
+    expect(coalesceAssistantText('already has replayed chunk here', 'replayed chunk')).toBe(
+      'already has replayed chunk here',
+    )
+    expect(coalesceAssistantText('Hello', ' world')).toBe('Hello world')
   })
 })
 
@@ -164,7 +174,8 @@ describe('foldCursorEvent', () => {
       cacheWriteTokens: 0,
     })
     state = settleStreaming(state)
-    expect(state.turns.find(t => t.role === 'assistant')).toMatchObject({ text: 'Hello' })
+    expect(state.turns.filter(t => t.role === 'assistant')).toHaveLength(1)
+    expect(state.turns.find(t => t.role === 'assistant')).toMatchObject({ text: 'Hello done' })
   })
 
   it('keeps usage across later turns and ignores empty payloads', () => {
@@ -282,6 +293,182 @@ describe('foldCursorEvent', () => {
     expect(state.turns).toEqual([{ id: 'turn-2', role: 'assistant', text: 'only' }])
   })
 
+  it('extends the same assistant band after thinking and task_notification', () => {
+    let state = fold(emptyChatFold(), {
+      type: 'assistant',
+      timestamp_ms: 1,
+      message: { content: [{ type: 'text', text: '两件都已经挂到当前 overlay 上了。' }] },
+    })
+    state = fold(state, { type: 'result', subtype: 'success' })
+    expect(state.turns).toMatchObject([{ role: 'assistant', text: '两件都已经挂到当前 overlay 上了。' }])
+    expect((state.turns[0] as { streaming?: boolean }).streaming).toBeUndefined()
+    state = fold(state, { type: 'system', subtype: 'task_notification' })
+    state = fold(state, { type: 'system', subtype: 'task_notification' })
+    state = fold(state, { type: 'thinking', subtype: 'delta', text: 'check' })
+    state = fold(state, {
+      type: 'assistant',
+      timestamp_ms: 2,
+      message: { content: [{ type: 'text', text: '两件都已经挂到当前 overlay 上了。' }] },
+    })
+    expect(state.turns.filter(t => t.role === 'assistant')).toHaveLength(1)
+    expect(state.turns.find(t => t.role === 'assistant')).toMatchObject({
+      text: '两件都已经挂到当前 overlay 上了。',
+      streaming: true,
+    })
+    state = fold(state, {
+      type: 'assistant',
+      timestamp_ms: 3,
+      message: { content: [{ type: 'text', text: '卡片插入已经跑完。' }] },
+    })
+    expect(state.turns.filter(t => t.role === 'assistant')).toHaveLength(1)
+    expect(state.turns.find(t => t.role === 'assistant')).toMatchObject({
+      text: '两件都已经挂到当前 overlay 上了。卡片插入已经跑完。',
+      streaming: true,
+    })
+    state = fold(state, {
+      type: 'assistant',
+      message: {
+        content: [{
+          type: 'text',
+          text: '两件都已经挂到当前 overlay 上了。卡片插入已经跑完。',
+        }],
+      },
+    })
+    expect(state.turns.filter(t => t.role === 'assistant')).toHaveLength(1)
+    expect(state.turns.find(t => t.role === 'assistant')).toMatchObject({
+      text: '两件都已经挂到当前 overlay 上了。卡片插入已经跑完。',
+    })
+    expect((state.turns.find(t => t.role === 'assistant') as { streaming?: boolean }).streaming)
+      .toBeUndefined()
+  })
+
+  it('opens a second assistant band only for a distinct complete message', () => {
+    let state = fold(emptyChatFold(), {
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: 'first' }] },
+    })
+    state = fold(state, {
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: 'unrelated later' }] },
+    })
+    expect(state.turns.map(turn => turn.role === 'assistant' ? turn.text : turn.role)).toEqual([
+      'first',
+      'unrelated later',
+    ])
+  })
+
+  it('ignores a duplicate complete snapshot of the same assistant text', () => {
+    const once = fold(emptyChatFold(), {
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: 'already has replayed chunk here' }] },
+    })
+    expect(fold(once, {
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: 'already has replayed chunk here' }] },
+    })).toBe(once)
+    expect(fold(once, {
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: 'replayed chunk' }] },
+    })).toBe(once)
+  })
+
+  it('keeps one assistant band across CLI resume replay after disconnect', () => {
+    let state = fold(emptyChatFold(), {
+      type: 'user',
+      message: { content: [{ type: 'text', text: 'hi' }] },
+    })
+    state = fold(state, {
+      type: 'assistant',
+      timestamp_ms: 1,
+      message: { content: [{ type: 'text', text: 'Hello' }] },
+    })
+    state = fold(state, { type: 'result', subtype: 'success' })
+    expect((state.turns.find(t => t.role === 'assistant') as { streaming?: boolean }).streaming)
+      .toBeUndefined()
+    state = fold(state, { type: 'system', subtype: 'init', model: 'Auto' })
+    state = fold(state, {
+      type: 'user',
+      message: { content: [{ type: 'text', text: 'hi' }] },
+    })
+    expect(state.turns.filter(t => t.role === 'user')).toHaveLength(1)
+    state = fold(state, {
+      type: 'assistant',
+      timestamp_ms: 2,
+      message: { content: [{ type: 'text', text: 'Hel' }] },
+    })
+    state = fold(state, {
+      type: 'assistant',
+      timestamp_ms: 3,
+      message: { content: [{ type: 'text', text: 'Hello world' }] },
+    })
+    expect(state.turns.filter(t => t.role === 'assistant')).toHaveLength(1)
+    expect(state.turns.find(t => t.role === 'assistant')).toMatchObject({
+      text: 'Hello world',
+      streaming: true,
+    })
+  })
+
+  it('still opens a new user turn when the operator resends the same text', () => {
+    let state = fold(emptyChatFold(), {
+      type: 'user',
+      message: { content: [{ type: 'text', text: 'hi' }] },
+    })
+    state = fold(state, { type: 'system', subtype: 'init', model: 'Auto' })
+    state = fold(state, {
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: 'yo' }] },
+    })
+    state = fold(state, { type: 'result', subtype: 'success' })
+    state = fold(state, {
+      type: 'user',
+      message: { content: [{ type: 'text', text: 'hi' }] },
+    })
+    expect(state.turns.filter(t => t.role === 'user')).toHaveLength(2)
+  })
+
+  it('rebuilds one assistant band when a snapshot replays resume events from empty', () => {
+    const events: Record<string, unknown>[] = [
+      { type: 'user', message: { content: [{ type: 'text', text: 'hi' }] } },
+      {
+        type: 'assistant',
+        timestamp_ms: 1,
+        message: { content: [{ type: 'text', text: 'Hello' }] },
+      },
+      { type: 'result', subtype: 'success' },
+      { type: 'system', subtype: 'init', model: 'Auto' },
+      { type: 'user', message: { content: [{ type: 'text', text: 'hi' }] } },
+      {
+        type: 'assistant',
+        timestamp_ms: 2,
+        message: { content: [{ type: 'text', text: 'Hello' }] },
+      },
+      {
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: 'Hello world' }] },
+      },
+    ]
+    const state = events.reduce(fold, emptyChatFold())
+    expect(state.turns.filter(t => t.role === 'user')).toHaveLength(1)
+    expect(state.turns.filter(t => t.role === 'assistant')).toHaveLength(1)
+    expect(state.turns.find(t => t.role === 'assistant')).toMatchObject({
+      text: 'Hello world',
+    })
+  })
+
+  it('does not append a replayed streaming prefix onto the live assistant band', () => {
+    let state = fold(emptyChatFold(), {
+      type: 'assistant',
+      timestamp_ms: 1,
+      message: { content: [{ type: 'text', text: 'Hello' }] },
+    })
+    state = fold(state, {
+      type: 'assistant',
+      timestamp_ms: 2,
+      message: { content: [{ type: 'text', text: 'Hel' }] },
+    })
+    expect(state.turns).toMatchObject([{ role: 'assistant', text: 'Hello', streaming: true }])
+  })
+
   it('truncates long tool JSON and skips non-JSON details', () => {
     const long = { path: 'x'.repeat(200) }
     const state = fold(emptyChatFold(), {
@@ -334,6 +521,37 @@ describe('hasMatchingRecentUser', () => {
     expect(hasMatchingRecentUser([
       { id: '1', role: 'user', text: 'hi' },
       { id: '2', role: 'assistant', text: 'yo' },
+    ], 'hi')).toBe(false)
+    expect(hasMatchingRecentUser([
+      { id: '1', role: 'user', text: 'hi' },
+      { id: '2', role: 'assistant', text: 'yo' },
+      { id: '3', role: 'activity', kind: 'init', label: 'Auto' },
+    ], 'hi')).toBe(true)
+    expect(hasMatchingRecentUser([
+      { id: '1', role: 'user', text: 'hi' },
+      { id: '2', role: 'thinking', text: 'plan', streaming: true },
+      { id: '3', role: 'activity', kind: 'init', label: 'Auto' },
+    ], 'hi')).toBe(true)
+    expect(hasMatchingRecentUser([
+      { id: '1', role: 'user', text: 'hi' },
+      {
+        id: '2',
+        role: 'tool',
+        name: 'read',
+        status: 'done',
+        family: 'generic',
+      },
+      { id: '3', role: 'activity', kind: 'notice', label: 'system/task_notification' },
+      { id: '4', role: 'activity', kind: 'init', label: 'Auto' },
+    ], 'hi')).toBe(true)
+    expect(hasMatchingRecentUser([
+      { id: '1', role: 'user', text: 'hi' },
+      { id: '2', role: 'activity', kind: 'init', label: 'Auto' },
+      { id: '3', role: 'assistant', text: 'yo' },
+    ], 'hi')).toBe(false)
+    expect(hasMatchingRecentUser([], 'hi')).toBe(false)
+    expect(hasMatchingRecentUser([
+      { id: '1', role: 'system', text: 'boom' },
     ], 'hi')).toBe(false)
   })
 })

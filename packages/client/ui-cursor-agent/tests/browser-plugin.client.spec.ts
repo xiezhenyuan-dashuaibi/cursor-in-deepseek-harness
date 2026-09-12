@@ -15,6 +15,8 @@ import { apply as nodeApply } from '../src/index.ts'
 import {
   OVERLAY_CARD_LIST_ENDPOINT, OVERLAY_CARD_PLUG_RPC_CHANNEL, OVERLAY_CARD_RPC_CHANNEL,
   OVERLAY_CARD_SET_HIDDEN_ENDPOINT, OVERLAY_CARD_SET_INSERTED_ENDPOINT,
+  OVERLAY_PLUGIN_LIST_ENDPOINT, OVERLAY_PLUGIN_RAIL_RPC_CHANNEL,
+  OVERLAY_PLUGIN_SWITCH_DESKTOP_ENDPOINT,
 } from '../src/client/overlay-card-rpc.ts'
 
 vi.mock('@xterm/xterm', () => ({ Terminal: class { dispose() {} onData() { return { dispose() {} } } } }))
@@ -100,9 +102,10 @@ describe('ui-cursor-agent browser apply', () => {
     face.raiseWindow()
     expect(stack.source.getSnapshot().front.at(-1)).toBe(OVERLAY_STACK_CURSOR_ID)
     expect(await face.listOverlayCards()).toEqual([
-      { id: '1', title: '卡片', hidden: false, inserted: true, occupants: [] },
+      { id: '1', title: '卡片', hidden: false, inserted: true, occupants: [], kind: 'card' },
     ])
     expect(call).toHaveBeenCalledWith(OVERLAY_CARD_RPC_CHANNEL, OVERLAY_CARD_LIST_ENDPOINT, {})
+    expect(call).toHaveBeenCalledWith(OVERLAY_PLUGIN_RAIL_RPC_CHANNEL, OVERLAY_PLUGIN_LIST_ENDPOINT, {})
     expect(call).not.toHaveBeenCalledWith(OVERLAY_CARD_PLUG_RPC_CHANNEL, OVERLAY_CARD_LIST_ENDPOINT, {})
     await face.setOverlayCardHidden('1', true)
     expect(call).toHaveBeenCalledWith(
@@ -129,12 +132,26 @@ describe('ui-cursor-agent browser apply', () => {
       OVERLAY_CARD_SET_INSERTED_ENDPOINT,
       { id: '1', inserted: false },
     )
+    call.mockClear()
+    call.mockResolvedValueOnce({ ok: true, value: {} })
+    await face.switchOverlayDesktop('ui-other-desk')
+    expect(call).toHaveBeenCalledWith(
+      OVERLAY_PLUGIN_RAIL_RPC_CHANNEL,
+      OVERLAY_PLUGIN_SWITCH_DESKTOP_ENDPOINT,
+      { id: 'ui-other-desk' },
+    )
+    call.mockRejectedValueOnce(new Error('405'))
+    call.mockRejectedValueOnce(new Error('405'))
     call.mockRejectedValueOnce(new Error('405'))
     call.mockRejectedValueOnce(new Error('405'))
     expect(await face.listOverlayCards()).toEqual([])
     call.mockResolvedValueOnce({ ok: false, error: { code: 'internal', message: 'x', details: {} } })
     call.mockResolvedValueOnce({ ok: false, error: { code: 'internal', message: 'x', details: {} } })
+    call.mockResolvedValueOnce({ ok: false, error: { code: 'internal', message: 'x', details: {} } })
+    call.mockResolvedValueOnce({ ok: false, error: { code: 'internal', message: 'x', details: {} } })
     expect(await face.listOverlayCards()).toEqual([])
+    call.mockResolvedValueOnce({ ok: true, value: { pid: 1 } })
+    call.mockResolvedValueOnce({ ok: true, value: { pid: 1 } })
     call.mockResolvedValueOnce({ ok: true, value: { pid: 1 } })
     call.mockResolvedValueOnce({ ok: true, value: { pid: 1 } })
     expect(await face.listOverlayCards()).toEqual([])
@@ -159,7 +176,8 @@ describe('ui-cursor-agent browser apply', () => {
 })
 
 describe('ui-cursor-agent node half', () => {
-  it('the node apply is an inert loader seat', () => {
-    expect(() => { nodeApply() }).not.toThrow()
+  it('the node apply waits for webServer without throwing', async () => {
+    const ctx = new Context()
+    await expect(ctx.plugin({ apply: nodeApply }).await()).resolves.toBeDefined()
   })
 })

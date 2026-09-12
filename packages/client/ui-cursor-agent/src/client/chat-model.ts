@@ -121,6 +121,25 @@ export function isAssistantDelta(event: Record<string, unknown>): boolean {
 }
 
 /**
+ * Join a later assistant payload onto text already shown for this user turn.
+ * After thinking, tools, `system/task_notification`, or a CLI `--resume`,
+ * Cursor often re-sends a prefix or a longer snapshot of the same message;
+ * those must not open a second band.
+ * @param existing - text already on the last assistant turn since the last user.
+ * @param incoming - text from this stream-json event.
+ * @returns the surviving text.
+ */
+export function coalesceAssistantText(existing: string, incoming: string): string {
+  if (incoming.length === 0) return existing
+  if (existing.length === 0) return incoming
+  if (incoming === existing) return existing
+  if (incoming.startsWith(existing)) return incoming
+  if (existing.startsWith(incoming)) return existing
+  if (incoming.length >= 8 && existing.includes(incoming)) return existing
+  return existing + incoming
+}
+
+/**
  * Best-effort tool display name from a `tool_call` event payload.
  * @param toolCall - the `tool_call` object on the event.
  * @returns a short label for the tool card.
@@ -279,29 +298,7 @@ export function foldCursorEvent(state: ChatFold, event: Record<string, unknown>)
     return withTurns(state, [...state.turns, { id: mintTurnId(), role: 'user', text }])
   }
   if (type === 'assistant') {
-    const text = messageText(event.message)
-    if (text.length === 0) return state
-    if (isAssistantDelta(event)) {
-      const last = state.turns.at(-1)
-      if (last?.role === 'assistant' && last.streaming) {
-        const next = [...state.turns]
-        next[next.length - 1] = {
-          id: last.id,
-          role: 'assistant',
-          text: last.text + text,
-          streaming: true,
-        }
-        return withTurns(state, next)
-      }
-      return withTurns(state, [...state.turns, { id: mintTurnId(), role: 'assistant', text, streaming: true }])
-    }
-    const last = state.turns.at(-1)
-    if (last?.role === 'assistant' && last.streaming) {
-      const next = [...state.turns]
-      next[next.length - 1] = { id: last.id, role: 'assistant', text }
-      return withTurns(state, next)
-    }
-    return withTurns(state, [...state.turns, { id: mintTurnId(), role: 'assistant', text }])
+    return foldAssistant(state, event)
   }
   if (type === 'thinking') {
     return foldThinking(state, event)
@@ -352,6 +349,68 @@ export function foldCursorEvent(state: ChatFold, event: Record<string, unknown>)
  */
 export function settleStreaming(state: ChatFold): ChatFold {
   return withTurns(state, settleStreamingTurns(state.turns))
+}
+
+function foldAssistant(state: ChatFold, event: Record<string, unknown>): ChatFold {
+  const text = messageText(event.message)
+  if (text.length === 0) return state
+  const delta = isAssistantDelta(event)
+  const index = lastAssistantIndexSinceUser(state.turns)
+  if (index < 0) {
+    return withTurns(state, [...state.turns, {
+      id: mintTurnId(),
+      role: 'assistant',
+      text,
+      ...(delta ? { streaming: true } : {}),
+    }])
+  }
+  const last = state.turns[index]
+  /* v8 ignore next -- index comes from a reverse scan of this array. */
+  if (last === undefined || last.role !== 'assistant') return state
+  if (delta && index === state.turns.length - 1 && last.streaming === true) {
+    const nextText = coalesceAssistantText(last.text, text)
+    if (nextText === last.text) return state
+    const next = [...state.turns]
+    next[index] = {
+      id: last.id,
+      role: 'assistant',
+      text: nextText,
+      streaming: true,
+    }
+    return withTurns(state, next)
+  }
+  if (
+    !delta
+    && !text.startsWith(last.text)
+    && !last.text.startsWith(text)
+    && !(text.length >= 8 && last.text.includes(text))
+  ) {
+    return withTurns(state, [...state.turns, { id: mintTurnId(), role: 'assistant', text }])
+  }
+  const nextText = coalesceAssistantText(last.text, text)
+  if (nextText === last.text && delta === (last.streaming === true)) return state
+  const next = [...state.turns]
+  next[index] = delta
+    ? { id: last.id, role: 'assistant', text: nextText, streaming: true }
+    : { id: last.id, role: 'assistant', text: nextText }
+  return withTurns(state, next)
+}
+
+/**
+ * Index of the latest assistant band after the most recent user turn.
+ * Thinking, tools, and system notices do not start a new user turn.
+ * @param turns - current transcript.
+ * @returns the index, or -1 when this user turn has no assistant yet.
+ */
+function lastAssistantIndexSinceUser(turns: readonly ChatTurn[]): number {
+  for (let index = turns.length - 1; index >= 0; index -= 1) {
+    const turn = turns[index]
+    /* v8 ignore next -- reverse scan stays inside the array bounds. */
+    if (turn === undefined) return -1
+    if (turn.role === 'user') return -1
+    if (turn.role === 'assistant') return index
+  }
+  return -1
 }
 
 function foldThinking(state: ChatFold, event: Record<string, unknown>): ChatFold {
@@ -439,24 +498,33 @@ function withTurns(state: ChatFold, turns: readonly ChatTurn[]): ChatFold {
 }
 
 /**
- * Whether a matching user turn already sits in the trailing pre-model block.
+ * Whether a matching user turn already sits in the open prompt.
  * Skips activity/system rows and other user rows so a queued optimistic prompt
- * between the echoed text and `system/init` does not defeat dedupe.
+ * between the echoed text and `system/init` does not defeat dedupe. After an
+ * assistant/thinking/tool row, the same text is a new prompt unless a more
+ * recent `system/init` (newer than that model row) marks a CLI `--resume`
+ * replay of the open turn. An earlier turn's init does not count.
  * @param turns - current transcript.
  * @param text - trimmed user text from the stream event.
  * @returns true when a matching recent user turn is already present.
  */
 export function hasMatchingRecentUser(turns: readonly ChatTurn[], text: string): boolean {
+  let seenInit = false
+  let seenModelTurn = false
   for (let index = turns.length - 1; index >= 0; index -= 1) {
     const turn = turns[index]
     /* v8 ignore next -- reverse scan stays inside the array bounds. */
     if (turn === undefined) return false
     if (turn.role === 'user') {
-      if (turn.text === text) return true
+      if (turn.text === text) return seenInit || !seenModelTurn
       continue
     }
-    if (turn.role === 'activity' || turn.role === 'system') continue
-    return false
+    if (turn.role === 'activity') {
+      if (turn.kind === 'init' && !seenModelTurn) seenInit = true
+      continue
+    }
+    if (turn.role === 'system') continue
+    seenModelTurn = true
   }
   return false
 }

@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, existsSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -11,11 +11,18 @@ import {
   findInsertRowByName,
   hasOverlayCardPlugRpc,
   hasOverlayCardRosterRpc,
+  hasOverlayPluginRailRpc,
+  hasOverlayPluginRosterRpc,
   OVERLAY_CARD_HIDE_RPC_MODULE,
   OVERLAY_CARD_PLUG_RPC_ID,
   OVERLAY_CARD_PLUG_RPC_MODULE,
   OVERLAY_CARD_ROSTER_RPC_ID,
   OVERLAY_CARD_ROSTER_RPC_MODULE,
+  OVERLAY_PLUGIN_RAIL_REMOUNT_MODULE,
+  OVERLAY_PLUGIN_RAIL_RPC_ID,
+  OVERLAY_PLUGIN_RAIL_RPC_MODULE,
+  OVERLAY_PLUGIN_ROSTER_RPC_ID,
+  OVERLAY_PLUGIN_ROSTER_RPC_MODULE,
   parseProfilePatch,
   patchHasId,
   profileDir,
@@ -23,17 +30,33 @@ import {
   resolveOverlayHome,
   runOverlayLivePlugin,
   stripProfileManifest,
+  bootGraphHasPackage,
+  buildCheckoutLib,
+  waitUntilBootGraphHas,
+  confirmLiveClientBoot,
+  LiveClientBootWaitError,
+  omitClientOverlayBody,
+  readLiveFiberProbe,
+  remountInsertRow,
+  setInsertRowDisabled,
 } from './overlay-live-plugin.ts'
 import {
   OVERLAY_CARD_PACKAGE_NAME, defaultOverlayCardSpec, formatOverlayCardInstances,
   parseOverlayCardInstances,
 } from '../packages/client/ui-float-window/src/instances.ts'
+import { OVERLAY_DESKTOP_PACKAGE_NAME } from '../packages/client/ui-overlay-desktop/src/desktop.ts'
 
 const temps: string[] = []
 
 afterEach(() => {
   for (const dir of temps.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
+
+function requestHref(input: Parameters<typeof fetch>[0]): string {
+  if (typeof input === 'string') return input
+  if (input instanceof URL) return input.href
+  return input.url
+}
 
 function tempDir(): string {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-overlay-live-'))
@@ -173,6 +196,18 @@ describe('overlay-live-plugin', () => {
     const yamlAfter = await readFile(join(profile, 'cordis.patch.yml'), 'utf8')
     expect(yamlAfter).toContain('id: demo')
     expect(yamlAfter).toContain('@deepseek-ai/dsh-client-demo')
+    expect(hasOverlayPluginRosterRpc(parseProfilePatch(yamlAfter).entries)).toBe(true)
+    expect(hasOverlayPluginRailRpc(parseProfilePatch(yamlAfter).entries)).toBe(true)
+    expect(yamlAfter).toContain(OVERLAY_PLUGIN_ROSTER_RPC_ID)
+    expect(yamlAfter).toContain(OVERLAY_PLUGIN_ROSTER_RPC_MODULE)
+    expect(yamlAfter).toContain(OVERLAY_PLUGIN_RAIL_RPC_ID)
+    expect(yamlAfter).toContain(OVERLAY_PLUGIN_RAIL_RPC_MODULE)
+    expect(await readFile(join(profile, 'overlay-plugin-roster-rpc.mjs'), 'utf8')).toContain('/overlay-plugins')
+    expect(await readFile(join(profile, 'overlay-plugin-roster-rpc.mjs'), 'utf8')).toContain('plugins.setInserted')
+    expect(await readFile(join(profile, 'overlay-plugin-roster-rpc.mjs'), 'utf8')).toContain('plugins.switchDesktop')
+    expect(await readFile(join(profile, 'overlay-plugin-roster-rpc.mjs'), 'utf8')).toContain('overlayBody')
+    expect(await readFile(join(profile, 'overlay-plugin-rail-rpc.mjs'), 'utf8')).toContain('/overlay-plugins-rail')
+    expect(await readFile(join(profile, 'overlay-plugin-rail-rpc.mjs'), 'utf8')).toContain('HOST_NAME')
     const destManifest = JSON.parse(await readFile(join(profile, 'plugins', 'demo', 'package.json'), 'utf8')) as {
       dependencies?: unknown
     }
@@ -219,6 +254,73 @@ describe('overlay-live-plugin', () => {
     expect(message).toContain('updated demo')
     expect(await readFile(join(profileDir(home, 'web'), 'cordis.patch.yml'), 'utf8')).toBe(yamlBefore)
     expect(await readFile(join(profileDir(home, 'web'), 'plugins', 'demo', 'lib/client.js'), 'utf8')).toContain('rebuilt')
+  })
+
+  it('adds the plugin roster RPC row on update when that row is missing', async () => {
+    const home = tempDir()
+    const profile = await seedProfile(home)
+    const checkout = join(home, 'checkout', 'demo')
+    await seedCheckout(checkout)
+    await runOverlayLivePlugin(['insert', checkout], {
+      home, profile: 'web', install: () => undefined,
+    })
+    const seeded = parseProfilePatch(await readFile(join(profile, 'cordis.patch.yml'), 'utf8'))
+    removeInsertRow(seeded.entries, OVERLAY_PLUGIN_ROSTER_RPC_ID)
+    await writeFile(join(profile, 'cordis.patch.yml'), dumpProfilePatch(seeded.comments, seeded.entries))
+    expect(hasOverlayPluginRosterRpc(parseProfilePatch(
+      await readFile(join(profile, 'cordis.patch.yml'), 'utf8'),
+    ).entries)).toBe(false)
+    await runOverlayLivePlugin(['update', checkout], {
+      home, profile: 'web', install: () => { throw new Error('must not install on update') },
+    })
+    const yaml = await readFile(join(profile, 'cordis.patch.yml'), 'utf8')
+    expect(hasOverlayPluginRosterRpc(parseProfilePatch(yaml).entries)).toBe(true)
+    expect(yaml).toContain(OVERLAY_PLUGIN_ROSTER_RPC_MODULE)
+    expect(yaml).toContain(OVERLAY_PLUGIN_RAIL_RPC_MODULE)
+    expect(yaml).not.toContain(OVERLAY_PLUGIN_RAIL_REMOUNT_MODULE)
+    expect(await readFile(join(profile, 'overlay-plugin-roster-rpc.mjs'), 'utf8')).toContain('/overlay-plugins')
+  })
+
+  it('adds the plugin rail RPC row on update when that row is missing', async () => {
+    const home = tempDir()
+    const profile = await seedProfile(home)
+    const checkout = join(home, 'checkout', 'demo')
+    await seedCheckout(checkout)
+    await runOverlayLivePlugin(['insert', checkout], {
+      home, profile: 'web', install: () => undefined,
+    })
+    const seeded = parseProfilePatch(await readFile(join(profile, 'cordis.patch.yml'), 'utf8'))
+    removeInsertRow(seeded.entries, OVERLAY_PLUGIN_RAIL_RPC_ID)
+    await writeFile(join(profile, 'cordis.patch.yml'), dumpProfilePatch(seeded.comments, seeded.entries))
+    expect(hasOverlayPluginRailRpc(parseProfilePatch(
+      await readFile(join(profile, 'cordis.patch.yml'), 'utf8'),
+    ).entries)).toBe(false)
+    await runOverlayLivePlugin(['update', checkout], {
+      home, profile: 'web', install: () => { throw new Error('must not install on update') },
+    })
+    const yaml = await readFile(join(profile, 'cordis.patch.yml'), 'utf8')
+    expect(hasOverlayPluginRailRpc(parseProfilePatch(yaml).entries)).toBe(true)
+    expect(yaml).toContain(OVERLAY_PLUGIN_RAIL_RPC_MODULE)
+    expect(await readFile(join(profile, 'overlay-plugin-rail-rpc.mjs'), 'utf8')).toContain('/overlay-plugins-rail')
+  })
+
+  it('retargets rail RPC when the sidecar source changed', async () => {
+    const home = tempDir()
+    const profile = await seedProfile(home)
+    const checkout = join(home, 'checkout', 'demo')
+    await seedCheckout(checkout)
+    await runOverlayLivePlugin(['insert', checkout], {
+      home, profile: 'web', install: () => undefined,
+    })
+    await writeFile(join(profile, 'overlay-plugin-rail-rpc.mjs'), 'export function apply() {}\n')
+    await runOverlayLivePlugin(['update', checkout], {
+      home, profile: 'web', install: () => { throw new Error('must not install on update') },
+    })
+    const yaml = await readFile(join(profile, 'cordis.patch.yml'), 'utf8')
+    const rail = parseProfilePatch(yaml).entries.flatMap(entry => entry.insert)
+      .find(row => row.id === OVERLAY_PLUGIN_RAIL_RPC_ID)
+    expect(rail?.name).toBe(OVERLAY_PLUGIN_RAIL_REMOUNT_MODULE)
+    expect(await readFile(join(profile, 'overlay-plugin-rail-rpc-2.mjs'), 'utf8')).toContain('/overlay-plugins-rail')
   })
 
   it('updates the live Loader directory even when it is not the checkout basename', async () => {
@@ -425,6 +527,9 @@ describe('overlay-live-plugin', () => {
     expect(yamlBefore).toContain(OVERLAY_CARD_PLUG_RPC_MODULE)
     expect(await readFile(join(profile, 'overlay-card-plug-rpc.mjs'), 'utf8')).toContain('/overlay-card-plug')
     expect(await readFile(join(profile, 'overlay-card-plug-rpc.mjs'), 'utf8')).toContain('occupants.setInserted')
+    expect(hasOverlayPluginRosterRpc(parseProfilePatch(yamlBefore).entries)).toBe(true)
+    expect(yamlBefore).toContain(OVERLAY_PLUGIN_ROSTER_RPC_MODULE)
+    expect(await readFile(join(profile, 'overlay-plugin-roster-rpc.mjs'), 'utf8')).toContain('/overlay-plugins')
     const added = await runOverlayLivePlugin([
       'insert', checkout, '--title', '草稿', '--card-id', 'draft', '--width', '520', '--height', '400',
     ], {
@@ -610,6 +715,70 @@ describe('overlay-live-plugin', () => {
     })).rejects.toThrow(/seat 3 is not loaded/)
   })
 
+  it('refuses a desktop page when the desktop host is missing', async () => {
+    const home = tempDir()
+    await seedProfile(home)
+    const page = join(home, 'checkout', 'ui-desk-page')
+    await seedCheckout(page, {
+      name: '@deepseek-ai/dsh-client-ui-desk-page',
+      overlayBody: 'overlay-desktop.body',
+    })
+    await expect(runOverlayLivePlugin(['insert', page], {
+      home, profile: 'web', install: () => undefined,
+    })).rejects.toThrow(/overlay desktop plugin is not loaded/)
+  })
+
+  it('is a no-op on repeat desktop-host insert and exclusive-disables other desktop occupants', async () => {
+    const home = tempDir()
+    const profile = await seedProfile(home)
+    const host = join(home, 'checkout', 'ui-overlay-desktop')
+    await seedCheckout(host, { name: OVERLAY_DESKTOP_PACKAGE_NAME })
+    await runOverlayLivePlugin(['insert', host], {
+      home, profile: 'web', install: () => undefined,
+    })
+    const repeat = await runOverlayLivePlugin(['insert', host], {
+      home,
+      profile: 'web',
+      install: () => {
+        throw new Error('must not install when the desktop host is already inserted')
+      },
+    })
+    expect(repeat).toMatch(/desktop host already inserted/)
+    const first = join(home, 'checkout', 'ui-desk-page')
+    await seedCheckout(first, {
+      name: '@deepseek-ai/dsh-client-ui-desk-page',
+      overlayBody: 'overlay-desktop.body',
+    })
+    await runOverlayLivePlugin(['insert', first], {
+      home, profile: 'web', install: () => undefined,
+    })
+    const second = join(home, 'checkout', 'ui-other-desk')
+    await seedCheckout(second, {
+      name: '@deepseek-ai/dsh-client-ui-other-desk',
+      overlayBody: 'overlay-desktop.body',
+    })
+    await runOverlayLivePlugin(['insert', second], {
+      home, profile: 'web', install: () => undefined,
+    })
+    const yaml = await readFile(join(profile, 'cordis.patch.yml'), 'utf8')
+    const parsed = parseProfilePatch(yaml)
+    expect(findInsertRowByName(parsed.entries, '@deepseek-ai/dsh-client-ui-desk-page')).toEqual({
+      id: 'ui-desk-page',
+      name: '@deepseek-ai/dsh-client-ui-desk-page',
+      disabled: true,
+    })
+    expect(findInsertRowByName(parsed.entries, '@deepseek-ai/dsh-client-ui-other-desk')).toEqual({
+      id: 'ui-other-desk',
+      name: '@deepseek-ai/dsh-client-ui-other-desk',
+    })
+    expect(findInsertRowByName(parsed.entries, OVERLAY_DESKTOP_PACKAGE_NAME)).toEqual({
+      id: 'ui-overlay-desktop',
+      name: OVERLAY_DESKTOP_PACKAGE_NAME,
+    })
+    expect(existsSync(join(profile, 'plugins', 'ui-overlay-desktop', 'instances.json'))).toBe(false)
+    expect(existsSync(join(profile, 'plugins', 'ui-float-window'))).toBe(false)
+  })
+
   it('round-trips disabled: true so a later insert does not re-enable the row', () => {
     const dumped = dumpProfilePatch('# keep\n', [{
       insert: [
@@ -629,6 +798,227 @@ describe('overlay-live-plugin', () => {
       id: 'ui-notes',
       name: '@deepseek-ai/dsh-client-ui-notes',
       disabled: true,
+    })
+  })
+
+  it('parses window.__DSH_BOOT__ and waits only when the live graph has the package', async () => {
+    const html = `<html><script>window.__DSH_BOOT__ = ${JSON.stringify({
+      rev: '1',
+      entries: [{ id: '@deepseek-ai/dsh-client-demo' }],
+    })};</script></html>`
+    expect(bootGraphHasPackage(html, '@deepseek-ai/dsh-client-demo')).toBe(true)
+    expect(bootGraphHasPackage(html, '@deepseek-ai/dsh-client-other')).toBe(false)
+    expect(bootGraphHasPackage('<html></html>', '@deepseek-ai/dsh-client-demo')).toBe(false)
+    let hits = 0
+    await waitUntilBootGraphHas('@deepseek-ai/dsh-client-demo', {
+      origin: 'http://127.0.0.1:9',
+      timeoutMs: 200,
+      intervalMs: 1,
+      fetchImpl: async () => {
+        hits += 1
+        if (hits < 2) return new Response('<html></html>', { status: 200 })
+        return new Response(html, { status: 200 })
+      },
+    })
+    expect(hits).toBe(2)
+    await expect(waitUntilBootGraphHas('@deepseek-ai/dsh-client-demo', {
+      origin: 'http://127.0.0.1:9',
+      timeoutMs: 30,
+      intervalMs: 5,
+      fetchImpl: async () => new Response('<html></html>', { status: 200 }),
+    })).rejects.toThrow(/not in window.__DSH_BOOT__/)
+    await expect(waitUntilBootGraphHas('@deepseek-ai/dsh-client-demo', {
+      origin: 'http://127.0.0.1:9',
+      timeoutMs: 20,
+      intervalMs: 5,
+      fetchImpl: async () => {
+        throw new Error('ECONNREFUSED')
+      },
+    })).rejects.toThrow(/ECONNREFUSED/)
+  })
+
+  it('builds checkout lib when tsdown.config.ts exists and waits for a client row after insert', async () => {
+    const home = tempDir()
+    await seedProfile(home)
+    const checkout = join(home, 'checkout', 'demo')
+    await seedCheckout(checkout)
+    await writeFile(join(checkout, 'tsdown.config.ts'), 'export default {}\n')
+    const builds: string[] = []
+    const waited: string[] = []
+    await buildCheckoutLib(checkout, cwd => builds.push(cwd))
+    expect(builds).toEqual([checkout])
+    const missing = join(home, 'checkout', 'no-tsdown')
+    await seedCheckout(missing)
+    await buildCheckoutLib(missing, () => {
+      throw new Error('must not build without tsdown.config.ts')
+    })
+    const message = await runOverlayLivePlugin(['insert', checkout], {
+      home,
+      profile: 'web',
+      install: () => undefined,
+      build: cwd => builds.push(`run:${cwd}`),
+      waitForClientRow: async (packageName, wait) => {
+        waited.push(packageName)
+        expect(wait.loaderId).toBe('demo')
+        expect(wait.liveManifestPath.replaceAll('\\', '/')).toContain('plugins/demo/package.json')
+      },
+    })
+    expect(message).toContain('inserted demo')
+    expect(builds).toContain(`run:${checkout}`)
+    expect(waited).toEqual(['@deepseek-ai/dsh-client-demo'])
+  })
+
+  it('skips build and boot-graph wait when --no-build and --no-wait are set', async () => {
+    const home = tempDir()
+    await seedProfile(home)
+    const checkout = join(home, 'checkout', 'demo')
+    await seedCheckout(checkout)
+    await writeFile(join(checkout, 'tsdown.config.ts'), 'export default {}\n')
+    const message = await runOverlayLivePlugin(['insert', checkout, '--no-build', '--no-wait'], {
+      home,
+      profile: 'web',
+      install: () => undefined,
+      build: () => {
+        throw new Error('must not build')
+      },
+      waitForClientRow: async () => {
+        throw new Error('must not wait')
+      },
+    })
+    expect(message).toContain('inserted demo')
+  })
+
+  it('omits overlayBody and remounts an insert row', async () => {
+    expect(omitClientOverlayBody({
+      name: '@deepseek-ai/dsh-client-demo',
+      dsh: { client: { platform: 'web', overlayBody: 'overlay-desktop.body', immediately: true } },
+    })).toEqual({
+      name: '@deepseek-ai/dsh-client-demo',
+      dsh: { client: { platform: 'web', immediately: true } },
+    })
+    expect(omitClientOverlayBody({ name: 'x', dsh: { client: { platform: 'web' } } })).toBeUndefined()
+    const parsed = parseProfilePatch(dumpProfilePatch('# keep\n', [{
+      insert: [{ id: 'demo', name: '@deepseek-ai/dsh-client-demo' }],
+    }]))
+    expect(setInsertRowDisabled(parsed.entries, 'demo', true)).toBe(true)
+    expect(findInsertRowByName(parsed.entries, '@deepseek-ai/dsh-client-demo')?.disabled).toBe(true)
+    expect(setInsertRowDisabled(parsed.entries, 'demo', false)).toBe(true)
+    expect(findInsertRowByName(parsed.entries, '@deepseek-ai/dsh-client-demo')?.disabled).toBeUndefined()
+    const home = tempDir()
+    const root = await seedProfile(home)
+    const patchPath = join(root, 'cordis.patch.yml')
+    const latest = parseProfilePatch(await readFile(patchPath, 'utf8'))
+    appendInsertRow(latest.entries, 'demo', '@deepseek-ai/dsh-client-demo')
+    await writeFile(patchPath, dumpProfilePatch(latest.comments, latest.entries))
+    const sleeps: number[] = []
+    await remountInsertRow(patchPath, 'demo', {
+      settleMs: 1,
+      sleep: async (ms) => { sleeps.push(ms) },
+    })
+    expect(sleeps).toEqual([1])
+    const after = parseProfilePatch(await readFile(patchPath, 'utf8'))
+    expect(findInsertRowByName(after.entries, '@deepseek-ai/dsh-client-demo')).toEqual({
+      id: 'demo',
+      name: '@deepseek-ai/dsh-client-demo',
+    })
+  })
+
+  it('classifies a boot-graph miss against Loader inventory and recovers an active fiber', async () => {
+    const htmlMissing = '<html><script>window.__DSH_BOOT__ = {"rev":"1","entries":[]};</script></html>'
+    const htmlPresent = `<html><script>window.__DSH_BOOT__ = ${JSON.stringify({
+      rev: '1',
+      entries: [{ id: '@deepseek-ai/dsh-client-demo' }],
+    })};</script></html>`
+    await expect(waitUntilBootGraphHas('@deepseek-ai/dsh-client-demo', {
+      origin: 'http://127.0.0.1:9',
+      timeoutMs: 20,
+      intervalMs: 5,
+      fetchImpl: async () => new Response(htmlMissing, { status: 200 }),
+    })).rejects.toBeInstanceOf(LiveClientBootWaitError)
+    const inventory = JSON.stringify({
+      result: {
+        ok: true,
+        value: {
+          entries: [{
+            entryId: 'demo',
+            moduleName: '@deepseek-ai/dsh-client-demo',
+            enabled: true,
+            fiberPhase: 'active',
+          }],
+        },
+      },
+    })
+    expect(await readLiveFiberProbe('@deepseek-ai/dsh-client-demo', {
+      origin: 'http://127.0.0.1:9',
+      fetchImpl: async () => new Response(inventory, { status: 200 }),
+    })).toEqual({ kind: 'match', fiber: { enabled: true, fiberPhase: 'active' } })
+    expect(await readLiveFiberProbe('@deepseek-ai/dsh-client-demo', {
+      origin: 'http://127.0.0.1:9',
+      fetchImpl: async () => new Response(JSON.stringify({
+        result: { ok: true, value: { entries: [] } },
+      }), { status: 200 }),
+    })).toEqual({ kind: 'absent' })
+    const failed = tempDir()
+    await writeFile(join(failed, 'package.json'), `${JSON.stringify({
+      name: '@deepseek-ai/dsh-client-demo',
+      dsh: { client: { platform: 'web', overlayBody: 'overlay-desktop.body' } },
+    }, null, 2)}\n`)
+    let remounts = 0
+    await expect(confirmLiveClientBoot('@deepseek-ai/dsh-client-demo', {
+      origin: 'http://127.0.0.1:9',
+      timeoutMs: 30,
+      intervalMs: 5,
+      recoverTimeoutMs: 20,
+      liveManifestPath: join(failed, 'package.json'),
+      remountFiber: async () => { remounts += 1 },
+      fetchImpl: async (input) => {
+        const url = requestHref(input)
+        if (url.includes('pluginInventory')) {
+          return new Response(JSON.stringify({
+            result: {
+              ok: true,
+              value: {
+                entries: [{
+                  entryId: 'demo',
+                  moduleName: '@deepseek-ai/dsh-client-demo',
+                  enabled: true,
+                  fiberPhase: 'failed',
+                }],
+              },
+            },
+          }), { status: 200 })
+        }
+        return new Response(htmlMissing, { status: 200 })
+      },
+    })).rejects.toThrow(/fiberPhase is failed[\s\S]*new npm name/)
+    expect(remounts).toBe(0)
+    const live = tempDir()
+    const liveManifest = join(live, 'package.json')
+    await writeFile(liveManifest, `${JSON.stringify({
+      name: '@deepseek-ai/dsh-client-demo',
+      dsh: { client: { platform: 'web', overlayBody: 'overlay-desktop.body' } },
+    }, null, 2)}\n`)
+    remounts = 0
+    await confirmLiveClientBoot('@deepseek-ai/dsh-client-demo', {
+      origin: 'http://127.0.0.1:9',
+      timeoutMs: 30,
+      intervalMs: 5,
+      recoverTimeoutMs: 200,
+      liveManifestPath: liveManifest,
+      remountFiber: async () => { remounts += 1 },
+      fetchImpl: async (input) => {
+        const url = requestHref(input)
+        if (url.includes('pluginInventory')) {
+          return new Response(inventory, { status: 200 })
+        }
+        if (remounts > 0) return new Response(htmlPresent, { status: 200 })
+        return new Response(htmlMissing, { status: 200 })
+      },
+    })
+    expect(remounts).toBe(1)
+    expect(JSON.parse(readFileSync(liveManifest, 'utf8'))).toEqual({
+      name: '@deepseek-ai/dsh-client-demo',
+      dsh: { client: { platform: 'web', overlayBody: 'overlay-desktop.body' } },
     })
   })
 })

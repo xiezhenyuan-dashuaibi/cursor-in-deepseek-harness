@@ -38,22 +38,22 @@ export interface OverlayNewPageOptions {
  * @returns directory, npm name, locale namespace.
  * @throws when the name is empty, nested, or not kebab-case.
  */
-export function parsePageName(raw: string): PageName {
+export function parsePageName(raw: string, command = 'overlay-new-page'): PageName {
   const trimmed = raw.trim().replaceAll('\\', '/')
   if (trimmed.length === 0) {
-    throw new Error('overlay-new-page: name is required')
+    throw new Error(`${command}: name is required`)
   }
   if (trimmed.includes('..') || isAbsolute(trimmed)) {
-    throw new Error('overlay-new-page: name must be a packages/client directory segment')
+    throw new Error(`${command}: name must be a packages/client directory segment`)
   }
   const stripped = trimmed.startsWith('packages/client/')
     ? trimmed.slice('packages/client/'.length)
     : trimmed
   if (stripped.includes('/')) {
-    throw new Error('overlay-new-page: name must be a single packages/client directory')
+    throw new Error(`${command}: name must be a single packages/client directory`)
   }
   if (!NAME_PATTERN.test(stripped)) {
-    throw new Error('overlay-new-page: name must be kebab-case (e.g. ui-notes or notes)')
+    throw new Error(`${command}: name must be kebab-case (e.g. ui-notes or notes)`)
   }
   const slug = stripped.startsWith('ui-') ? stripped.slice('ui-'.length) : stripped
   return {
@@ -97,10 +97,9 @@ export function runOverlayNewPage(argv: readonly string[], options: OverlayNewPa
   return [
     `Wrote ${relDest} (${name.npmName}).`,
     'Next:',
-    `  pnpm install --filter ./${relDest}...`,
-    '  # edit Page.tsx, locales.ts, and Page.module.css only',
-    `  pnpm --filter ${name.npmName} bundle`,
     '  pnpm overlay:live insert packages/client/ui-float-window',
+    `  pnpm install --filter ./${relDest}...`,
+    '  # edit Page.tsx, locales.ts, and Page.module.css only; keep OverlayPageKey',
     `  pnpm overlay:live insert ${relDest}`,
   ].join('\n')
 }

@@ -175,6 +175,12 @@
           - --approve-mcps
           - --trust
 
+    # Shared extra-tool MCP for overlay Cursor CLIs (Streamable HTTP `/cursor-mcp`).
+    - id: cursor-mcp-server
+      name: '@deepseek-ai/dsh-cursor-mcp-server'
+      config:
+        cwd: !!js process.cwd()
+
     - id: api-remotes
       name: '@deepseek-ai/dsh-api-remotes'
 

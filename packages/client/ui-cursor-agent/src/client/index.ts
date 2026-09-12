@@ -14,7 +14,8 @@ import { CursorPanel } from './CursorPanel.tsx'
 import type { CursorAgentInjected } from './CursorPanel.tsx'
 import { CURSOR_OVERLAY_SKIP_ONBOARDING_ID, SkipOnboarding } from './SkipOnboarding.tsx'
 import {
-  callOverlayCardList, callOverlayCardSetHidden, callOverlayCardSetInserted,
+  callOverlayPluginList, callOverlayPluginSetHidden, callOverlayPluginSetInserted,
+  callOverlayPluginSwitchDesktop,
 } from './overlay-card-rpc.ts'
 import { en, zh, type CursorAgentKey } from './locales.ts'
 
@@ -50,12 +51,15 @@ export function apply(ctx: ClientContext): void {
       locale: NS,
       inject: (): CursorAgentInjected => ({
         raiseWindow: () => { ctx.overlayStack.raise(OVERLAY_STACK_CURSOR_ID) },
-        listOverlayCards: async () => await callOverlayCardList(connection.rpc),
-        setOverlayCardHidden: async (id, hidden) => {
-          await callOverlayCardSetHidden(connection.rpc, id, hidden)
+        listOverlayCards: async () => await callOverlayPluginList(connection.rpc),
+        setOverlayCardHidden: async (id, hidden, kind) => {
+          await callOverlayPluginSetHidden(connection.rpc, id, hidden, kind)
         },
-        setOverlayCardInserted: async (id, inserted) => {
-          await callOverlayCardSetInserted(connection.rpc, id, inserted)
+        setOverlayCardInserted: async (id, inserted, kind) => {
+          await callOverlayPluginSetInserted(connection.rpc, id, inserted, kind)
+        },
+        switchOverlayDesktop: async (id) => {
+          await callOverlayPluginSwitchDesktop(connection.rpc, id)
         },
         hooks: {
           overlayStack: ctx.overlayStack.source,

@@ -10,7 +10,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { OVERLAY_STACK_DESK_ID } from './overlay-stack-ids.ts'
 import {
-  OVERLAY_CARD_NUMBERS, overlayCardBodySlot, overlayCardTrailingSlot,
+  overlayCardBodySlot, overlayCardDeclaredSeatCount, overlayCardRosterMaxSeat,
+  overlayCardTrailingSlot,
 } from '../instances.ts'
 import type { OverlayCardInjected } from './contract/slots.ts'
 import './contract/slots.ts'
@@ -26,8 +27,7 @@ export type {
   OverlayCardPreferredFrame,
 } from './contract/slots.ts'
 export {
-  overlayCardBodySlot, overlayCardTrailingSlot, OVERLAY_CARD_MAX, OVERLAY_CARD_NUMBERS,
-  OVERLAY_CARD_PACKAGE_NAME,
+  overlayCardBodySlot, overlayCardTrailingSlot, OVERLAY_CARD_PACKAGE_NAME,
 } from '../instances.ts'
 export type {
   OverlayCardBodySlot, OverlayCardChildSlot, OverlayCardNumber, OverlayCardRoster,
@@ -41,10 +41,10 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-/** Child-slot table the desk predeclares so adding a card does not remount. */
-function overlayCardSlotChildren(): Record<string, { kind: 'single' | 'list'; scope: 'root' }> {
+/** Child-slot table OverlayDesk predeclares through seat `maxSeat`. */
+function overlayCardSlotChildren(maxSeat: number): Record<string, { kind: 'single' | 'list'; scope: 'root' }> {
   const children: Record<string, { kind: 'single' | 'list'; scope: 'root' }> = {}
-  for (const n of OVERLAY_CARD_NUMBERS) {
+  for (let n = 1; n <= maxSeat; n += 1) {
     children[overlayCardBodySlot(n)] = { kind: 'single', scope: 'root' }
     children[overlayCardTrailingSlot(n)] = { kind: 'list', scope: 'root' }
   }
@@ -56,6 +56,8 @@ export const inject = ['slots', 'locale', 'connection', 'overlayStack']
 
 /**
  * Client plugin body: dictionaries, roster poll, and the overlay card desk.
+ * OverlayDesk children grow with the roster high-water mark so a later insert
+ * does not remount existing windows until the predeclared block is crossed.
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
@@ -63,22 +65,41 @@ export function apply(ctx: ClientContext): void {
   const connection = ctx.get('connection') as ConnectionHandle
   const roster = createOverlayCardRoster(connection.rpc)
   ctx.effect(() => () => roster.dispose(), 'ui-float-window: close roster poll')
-  ctx.slots.inject('shell.overlay', () => ctx.slots.register(
-    {
-      name: 'shell.overlay',
-      id: 'overlay-card',
-      order: 220,
-      locale: NS,
-      store: () => createOverlayDeskStore(readPersistedCardFrames()),
-      children: overlayCardSlotChildren(),
-      inject: (): OverlayCardInjected => ({
-        raiseDesk: () => { ctx.overlayStack.raise(OVERLAY_STACK_DESK_ID) },
-        hooks: {
-          roster,
-          overlayStack: ctx.overlayStack.source,
+  ctx.slots.inject('shell.overlay', () => {
+    const store = createOverlayDeskStore(readPersistedCardFrames())
+    let declaredSeats = 0
+    let disposeDesk: (() => void) | undefined
+    const mount = (seats: number): void => {
+      if (seats === declaredSeats && disposeDesk !== undefined) return
+      disposeDesk?.()
+      declaredSeats = seats
+      disposeDesk = ctx.slots.register(
+        {
+          name: 'shell.overlay',
+          id: 'overlay-card',
+          order: 220,
+          locale: NS,
+          store,
+          children: overlayCardSlotChildren(seats),
+          inject: (): OverlayCardInjected => ({
+            raiseDesk: () => { ctx.overlayStack.raise(OVERLAY_STACK_DESK_ID) },
+            hooks: {
+              roster,
+              overlayStack: ctx.overlayStack.source,
+            },
+          }),
         },
-      }),
-    },
-    OverlayDesk,
-  ))
+        OverlayDesk,
+      )
+    }
+    const sync = (): void => {
+      mount(overlayCardDeclaredSeatCount(overlayCardRosterMaxSeat(roster.getSnapshot().cards)))
+    }
+    sync()
+    const unsub = roster.subscribe(sync)
+    return () => {
+      unsub()
+      disposeDesk?.()
+    }
+  })
 }

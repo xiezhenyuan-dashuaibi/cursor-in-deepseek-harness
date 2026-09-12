@@ -22,6 +22,7 @@ import {
 } from '../src/client/overlay-stack-ids.ts'
 import { CURSOR_AGENT_PTY_PATH } from '../src/client/pty-path.ts'
 import { OVERLAY_RAIL_STORAGE_KEY } from '../src/client/rail-storage.ts'
+import { CURSOR_HOST_BOOT_META } from '../src/client/host-boot.ts'
 import {
   readPersistedGeometry, writePersistedGeometry,
 } from '../src/client/geometry-storage.ts'
@@ -95,12 +96,24 @@ class FakeWebSocket {
   }
 }
 
+const PANEL_BOOT = 'test-boot'
+
+function setHostBootMeta(id: string | undefined): void {
+  for (const el of document.querySelectorAll(`meta[name="${CURSOR_HOST_BOOT_META}"]`)) el.remove()
+  if (id === undefined) return
+  const meta = document.createElement('meta')
+  meta.setAttribute('name', CURSOR_HOST_BOOT_META)
+  meta.setAttribute('content', id)
+  document.head.append(meta)
+}
+
 afterEach(() => {
   cleanup()
   harness.sockets.length = 0
   resetOverlaySessionIdsForTests()
   resetTurnIdsForTests()
   localStorage.clear()
+  setHostBootMeta(undefined)
   vi.unstubAllGlobals()
   vi.useRealTimers()
 })
@@ -109,6 +122,7 @@ beforeEach(() => {
   resetOverlaySessionIdsForTests()
   resetTurnIdsForTests()
   localStorage.clear()
+  setHostBootMeta(PANEL_BOOT)
   vi.stubGlobal('WebSocket', FakeWebSocket)
   vi.stubGlobal('location', { origin: 'http://127.0.0.1:3080' })
   window.innerWidth = 1920
@@ -129,6 +143,7 @@ function panelProps(extra?: Partial<CursorPanelProps>): CursorPanelProps {
     listOverlayCards: vi.fn(async () => []),
     setOverlayCardHidden: vi.fn(async () => {}),
     setOverlayCardInserted: vi.fn(async () => {}),
+    switchOverlayDesktop: vi.fn(async () => {}),
     useOverlayStack: (selector: (snapshot: OverlayStackSnapshot) => unknown) => selector(stack),
     ...extra,
   } as unknown as CursorPanelProps
@@ -152,6 +167,32 @@ function lastSocket() {
   const socket = harness.sockets.at(-1)
   expect(socket).toBeDefined()
   return socket!
+}
+
+/**
+ * Chromium moves the caret to the end when `style.height` is assigned; jsdom does not.
+ * @param input - the compose textarea under test.
+ */
+function yankCaretToEndOnHeightWrite(input: HTMLTextAreaElement): void {
+  const style = input.style
+  const proto = Object.getPrototypeOf(style) as CSSStyleDeclaration
+  const desc = Object.getOwnPropertyDescriptor(proto, 'height')
+    ?? Object.getOwnPropertyDescriptor(CSSStyleDeclaration.prototype, 'height')
+  const write = desc?.set
+  const read = desc?.get
+  Object.defineProperty(style, 'height', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return read !== undefined ? read.call(this) : style.getPropertyValue('height')
+    },
+    set(value: string) {
+      if (write !== undefined) write.call(this, value)
+      else style.setProperty('height', value)
+      const end = input.value.length
+      input.setSelectionRange(end, end)
+    },
+  })
 }
 
 function confirmNewSession(view: ReturnType<typeof renderPanel>, name?: string) {
@@ -240,6 +281,26 @@ describe('CursorPanel chat', () => {
     expect(view.container.querySelector('[data-cursor-agent-rail]')?.getAttribute('title'))
       .toBe('')
     await waitFor(() => { expect(view.getByRole('status').textContent).toBe('已连接') })
+    const mcp = view.container.querySelector('[data-cursor-agent-dsh-mcp]')
+    expect(mcp?.textContent).toBe('dsh_mcp 启动中')
+    expect(mcp?.getAttribute('data-connected')).toBe('checking')
+    expect(strip?.contains(mcp)).toBe(true)
+    act(() => {
+      harness.sockets[0]?.emit('message', {
+        data: JSON.stringify({ op: 'dsh_mcp', status: 'connected' }),
+      } as MessageEvent)
+    })
+    await waitFor(() => {
+      expect(view.container.querySelector('[data-cursor-agent-dsh-mcp]')?.textContent).toBe('dsh_mcp 已连接')
+    })
+    act(() => {
+      harness.sockets[0]?.emit('message', {
+        data: JSON.stringify({ op: 'dsh_mcp', status: 'disconnected' }),
+      } as MessageEvent)
+    })
+    await waitFor(() => {
+      expect(view.container.querySelector('[data-cursor-agent-dsh-mcp]')?.textContent).toBe('dsh_mcp 启动中')
+    })
   })
 
   it('collapses after a session click on mouse leave, but keeps open for create input', async () => {
@@ -323,11 +384,38 @@ describe('CursorPanel chat', () => {
   it('lists overlay cards above the rail plugin control and hides or unplugs without deleting', async () => {
     const setOverlayCardHidden = vi.fn(async () => {})
     const setOverlayCardInserted = vi.fn(async () => {})
+    const switchOverlayDesktop = vi.fn(async () => {})
     const listOverlayCards = vi.fn(async () => ([
-      { id: '1', title: '卡片', hidden: false, inserted: true, occupants: ['ui-notes'] },
-      { id: 'draft', title: '草稿', hidden: true, inserted: false, occupants: ['ui-draft'] },
+      { id: '1', title: '卡片', hidden: false, inserted: true, occupants: ['ui-notes'], kind: 'card' as const },
+      { id: 'draft', title: '草稿', hidden: true, inserted: false, occupants: ['ui-draft'], kind: 'card' as const },
+      {
+        id: 'ui-fish-tank',
+        title: '摸鱼工作台',
+        hidden: false,
+        inserted: true,
+        occupants: ['ui-fish-tank'],
+        kind: 'desktop' as const,
+      },
+      {
+        id: 'ui-other-desk',
+        title: '另一桌面',
+        hidden: false,
+        inserted: false,
+        occupants: ['ui-other-desk'],
+        kind: 'desktop' as const,
+      },
+      {
+        id: 'ui-lab-fiber',
+        title: '实验 fiber',
+        hidden: false,
+        inserted: true,
+        occupants: ['ui-lab-fiber'],
+        kind: 'fiber' as const,
+      },
     ]))
-    const view = renderPanel({ listOverlayCards, setOverlayCardHidden, setOverlayCardInserted })
+    const view = renderPanel({
+      listOverlayCards, setOverlayCardHidden, setOverlayCardInserted, switchOverlayDesktop,
+    })
     await waitFor(() => { expect(view.getByRole('status').textContent).toBe('已连接') })
     const toggle = view.container.querySelector('[data-cursor-agent-plugins-toggle]') as HTMLButtonElement
     const rail = view.container.querySelector('[data-cursor-agent-rail]') as HTMLElement
@@ -346,24 +434,50 @@ describe('CursorPanel chat', () => {
     expect(dock.contains(panel)).toBe(true)
     expect(dock.contains(toggle)).toBe(true)
     expect(rail.hasAttribute('data-rail-open')).toBe(true)
+    expect(view.container.querySelector('[data-cursor-agent-plugin-desktop]')?.textContent)
+      .toContain('摸鱼工作台')
     expect(view.container.querySelector('[data-cursor-agent-plugin-id="1"]')?.textContent).toContain('卡片')
     expect(view.container.querySelector('[data-cursor-agent-plugin-id="draft"]')?.textContent).toContain('草稿')
+    expect(view.container.querySelector('[data-cursor-agent-plugin-id="ui-other-desk"]')?.textContent)
+      .toContain('另一桌面')
+    expect(view.container.querySelector('[data-cursor-agent-plugin-id="ui-lab-fiber"]')?.textContent)
+      .toContain('实验 fiber')
+    expect(view.container.querySelector(
+      '[data-cursor-agent-plugin-id="ui-fish-tank"] [data-cursor-agent-plugin-hide]',
+    )).toBeNull()
+    expect(view.container.querySelector(
+      '[data-cursor-agent-plugin-id="ui-lab-fiber"] [data-cursor-agent-plugin-hide]',
+    )).toBeNull()
     fireEvent.click(view.container.querySelector('[data-cursor-agent-plugin-hide]')!)
     await waitFor(() => {
-      expect(setOverlayCardHidden).toHaveBeenCalledWith('1', true)
+      expect(setOverlayCardHidden).toHaveBeenCalledWith('1', true, 'card')
     })
     expect(setOverlayCardInserted).not.toHaveBeenCalled()
     fireEvent.click(view.container.querySelector('[data-cursor-agent-plugin-unplug]')!)
     await waitFor(() => {
-      expect(setOverlayCardInserted).toHaveBeenCalledWith('1', false)
+      expect(setOverlayCardInserted).toHaveBeenCalledWith('1', false, 'card')
     })
     fireEvent.click(view.container.querySelector('[data-cursor-agent-plugin-show]')!)
     await waitFor(() => {
-      expect(setOverlayCardHidden).toHaveBeenCalledWith('draft', false)
+      expect(setOverlayCardHidden).toHaveBeenCalledWith('draft', false, 'card')
     })
     fireEvent.click(view.container.querySelector('[data-cursor-agent-plugin-plug]')!)
     await waitFor(() => {
-      expect(setOverlayCardInserted).toHaveBeenCalledWith('draft', true)
+      expect(setOverlayCardInserted).toHaveBeenCalledWith('draft', true, 'card')
+    })
+    fireEvent.click(view.container.querySelector('[data-cursor-agent-plugin-unload]')!)
+    await waitFor(() => {
+      expect(setOverlayCardInserted).toHaveBeenCalledWith('ui-fish-tank', false, 'desktop')
+    })
+    fireEvent.click(view.container.querySelector('[data-cursor-agent-plugin-switch]')!)
+    await waitFor(() => {
+      expect(switchOverlayDesktop).toHaveBeenCalledWith('ui-other-desk')
+    })
+    fireEvent.click(
+      view.container.querySelector('[data-cursor-agent-plugin-id="ui-lab-fiber"] [data-cursor-agent-plugin-unplug]')!,
+    )
+    await waitFor(() => {
+      expect(setOverlayCardInserted).toHaveBeenCalledWith('ui-lab-fiber', false, 'fiber')
     })
   })
 
@@ -371,10 +485,10 @@ describe('CursorPanel chat', () => {
     const setOverlayCardInserted = vi.fn(async () => {})
     const listOverlayCards = vi.fn()
       .mockResolvedValueOnce([{
-        id: 'hub', title: '后端', hidden: false, inserted: true, occupants: ['ui-petshop-hub'],
+        id: 'draft', title: '草稿', hidden: false, inserted: true, occupants: ['ui-lab'],
       }])
       .mockResolvedValue([{
-        id: 'hub', title: '后端', hidden: false, inserted: false, occupants: ['ui-petshop-hub'],
+        id: 'draft', title: '草稿', hidden: false, inserted: false, occupants: ['ui-lab'],
       }])
     const view = renderPanel({ listOverlayCards, setOverlayCardInserted })
     await waitFor(() => { expect(view.getByRole('status').textContent).toBe('已连接') })
@@ -384,7 +498,7 @@ describe('CursorPanel chat', () => {
     })
     fireEvent.click(view.container.querySelector('[data-cursor-agent-plugin-unplug]')!)
     await waitFor(() => {
-      expect(setOverlayCardInserted).toHaveBeenCalledWith('hub', false)
+      expect(setOverlayCardInserted).toHaveBeenCalledWith('draft', false, undefined)
     })
     await waitFor(() => {
       const action = view.container.querySelector('[data-cursor-agent-plugin-plug]')
@@ -427,7 +541,7 @@ describe('CursorPanel chat', () => {
     fireEvent.click(toggle)
     await waitFor(() => {
       expect(view.container.querySelector('[data-cursor-agent-plugins-panel]')?.textContent)
-        .toContain('没有卡片窗口')
+        .toContain('没有插件')
     })
     fireEvent.click(toggle)
     fireEvent.click(toggle)
@@ -436,7 +550,7 @@ describe('CursorPanel chat', () => {
     })
     fireEvent.click(view.container.querySelector('[data-cursor-agent-plugin-hide]')!)
     await waitFor(() => {
-      expect(setOverlayCardHidden).toHaveBeenCalledWith('1', true)
+      expect(setOverlayCardHidden).toHaveBeenCalledWith('1', true, undefined)
     })
     expect(view.container.querySelector('[data-cursor-agent-plugin-id="1"]')).toBeTruthy()
     expect(view.container.querySelector('[data-cursor-agent-plugins-error]')?.textContent)
@@ -1103,6 +1217,46 @@ describe('CursorPanel chat', () => {
     await waitFor(() => { expect(input.value).toBe('xzy') })
   })
 
+  it('keeps the caret after Backspace when a height write would yank it to the end', async () => {
+    const view = renderPanel()
+    await waitFor(() => { expect(view.container.querySelector('textarea')).toBeTruthy() })
+    const input = view.container.querySelector('textarea') as HTMLTextAreaElement
+    yankCaretToEndOnHeightWrite(input)
+    for (const key of 'abc') fireEvent.keyDown(input, { key })
+    await waitFor(() => { expect(input.value).toBe('abc') })
+    input.setSelectionRange(2, 2)
+    fireEvent.keyDown(input, { key: 'Backspace' })
+    await waitFor(() => { expect(input.value).toBe('ac') })
+    expect(input.selectionStart).toBe(1)
+    expect(input.selectionEnd).toBe(1)
+    fireEvent.keyDown(input, { key: 'Backspace' })
+    await waitFor(() => { expect(input.value).toBe('c') })
+    expect(input.selectionStart).toBe(0)
+  })
+
+  it('keeps a clicked caret when the below-prompt card relayouts the composer', async () => {
+    const view = renderPanel()
+    await waitFor(() => { expect(view.container.querySelector('textarea')).toBeTruthy() })
+    const input = view.container.querySelector('textarea') as HTMLTextAreaElement
+    yankCaretToEndOnHeightWrite(input)
+    for (const key of 'abc') fireEvent.keyDown(input, { key })
+    await waitFor(() => { expect(input.value).toBe('abc') })
+    input.setSelectionRange(1, 1)
+    lastSocket().emit('message', {
+      data: JSON.stringify({
+        op: 'mirror',
+        input: 'abc',
+        below: [{ text: 'hint row', highlighted: false }],
+      }),
+    } as MessageEvent)
+    await waitFor(() => {
+      expect(view.container.querySelector('[data-cursor-agent-mirror-line]')).toBeTruthy()
+    })
+    expect(input.value).toBe('abc')
+    expect(input.selectionStart).toBe(1)
+    expect(input.selectionEnd).toBe(1)
+  })
+
   it('keeps a local draft while running and jumps back to the bottom', async () => {
     const view = renderPanel()
     await waitFor(() => { expect(view.getByRole('status').textContent).toBe('已连接') })
@@ -1445,6 +1599,7 @@ describe('CursorPanel chat', () => {
 
   it('restores named sessions from localStorage and mints the next id', async () => {
     localStorage.setItem(OVERLAY_RAIL_STORAGE_KEY, JSON.stringify({
+      bootId: PANEL_BOOT,
       sessions: [{ id: 'cursor-cli-4', label: 'Keep' }],
       activeId: 'cursor-cli-4',
     }))
@@ -1455,6 +1610,28 @@ describe('CursorPanel chat', () => {
     await waitFor(() => {
       expect(view.container.querySelector('[data-cursor-agent-session="cursor-cli-5"]')).toBeTruthy()
     })
+  })
+
+  it('starts at Chat 1 when the stored rail belongs to a previous dsh web process', () => {
+    localStorage.setItem(OVERLAY_RAIL_STORAGE_KEY, JSON.stringify({
+      bootId: 'previous-process',
+      sessions: [{ id: 'cursor-cli-24', label: 'Chat 24' }],
+      activeId: 'cursor-cli-24',
+    }))
+    const view = renderPanel()
+    expect(view.container.querySelector('[data-cursor-agent-session="cursor-cli-24"]')).toBeNull()
+    expect(view.container.querySelector('[data-cursor-agent-session="cursor-cli-1"]')?.getAttribute('title')).toBe('Chat 1')
+  })
+
+  it('starts at Chat 1 when the index has no host boot meta', () => {
+    setHostBootMeta(undefined)
+    localStorage.setItem(OVERLAY_RAIL_STORAGE_KEY, JSON.stringify({
+      bootId: PANEL_BOOT,
+      sessions: [{ id: 'cursor-cli-24', label: 'Chat 24' }],
+      activeId: 'cursor-cli-24',
+    }))
+    const view = renderPanel()
+    expect(view.container.querySelector('[data-cursor-agent-session="cursor-cli-1"]')?.getAttribute('title')).toBe('Chat 1')
   })
 })
 
@@ -1570,6 +1747,30 @@ describe('composer PTY mirror', () => {
     fireEvent.mouseDown(mirror)
     fireEvent.keyDown(mirror, { key: 'ArrowUp' })
     expect(lastSocket().sent.some(item => String(item).includes('[A'))).toBe(true)
+  })
+
+  it('marks the leading → row as active when the host omits reverse-video', async () => {
+    const view = renderPanel()
+    await waitFor(() => { expect(view.getByRole('status').textContent).toBe('已连接') })
+    lastSocket().emit('message', {
+      data: JSON.stringify({
+        op: 'mirror',
+        input: '/',
+        below: [
+          { text: '  /model [filter]  Select model', highlighted: false },
+          { text: '  /goal [objective]  Start a durable goal', highlighted: false },
+          { text: '  → /Ask  Toggle ask mode (Q&A, read-only / no edits or command execution)', highlighted: false },
+          { text: '  ↓ more below', highlighted: false },
+        ],
+      }),
+    } as MessageEvent)
+    await waitFor(() => {
+      const rows = [...view.container.querySelectorAll('[data-cursor-agent-mirror-line]')]
+      expect(rows).toHaveLength(4)
+      expect(rows[2]?.hasAttribute('data-active')).toBe(true)
+      expect(rows[0]?.hasAttribute('data-active')).toBe(false)
+      expect(rows[3]?.hasAttribute('data-active')).toBe(false)
+    })
   })
 
   it('paints an AskQuestion mirror on the same glass card and forwards answer keys', async () => {
@@ -1733,6 +1934,18 @@ describe('overlay chrome CSS', () => {
     expect(source).toContain('.mark')
     expect(source).toContain('.chatColumn')
     expect(source).toContain('.dragStrip')
+    expect(source).toContain('.mcpStatus')
+    expect(source).toContain(".mcpStatus[data-connected='connected']")
+    expect(source).toMatch(
+      /\.mcpStatus\[data-connected='connected'\] \{[\s\S]*?color: var\(--dsw-alias-label-primary\);[\s\S]*?font-weight: 700;/,
+    )
+    expect(source).toMatch(
+      /\.mcpStatus\[data-connected='disconnected'\] \{[\s\S]*?color: var\(--dsw-alias-label-primary\);[\s\S]*?font-weight: 400;/,
+    )
+    expect(source).toContain('--dsw-alias-state-error-secondary')
+    expect(source).toMatch(
+      /\.spriteHint\[data-sprite-status='live'\] \{[\s\S]*?color: var\(--dsw-alias-label-primary\);[\s\S]*?font-weight: 700;/,
+    )
     expect(source).toContain('height: 1cm')
     expect(source).toContain('linear-gradient')
     expect(source).toContain('margin-bottom: -20px')
@@ -1757,6 +1970,9 @@ describe('overlay chrome CSS', () => {
     expect(source).toContain('width: 4px')
     expect(source).toContain('.suggestList')
     expect(source).toContain('.cliBelow')
+    expect(source).toMatch(/\.cliBelow \{[\s\S]*?white-space: pre-wrap/)
+    expect(source).toMatch(/\.cliBelow \{[\s\S]*?overflow-x: hidden/)
+    expect(source).toMatch(/\.cliBelow \{[\s\S]*?overscroll-behavior: contain/)
     expect(source).toContain('backdrop-filter: blur(14px)')
     expect(source).toContain('var(--dsw-shadow-lv3)')
     expect(source).toContain('.cliBelowRow')
