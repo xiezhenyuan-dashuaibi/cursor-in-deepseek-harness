@@ -481,6 +481,43 @@ describe('CursorPanel chat', () => {
     })
   })
 
+  it('hides a shaped occupant without unplugging', async () => {
+    const setOverlayCardHidden = vi.fn(async () => {})
+    const setOverlayCardInserted = vi.fn(async () => {})
+    const listOverlayCards = vi.fn(async () => ([
+      {
+        id: 'ui-sprite',
+        title: '精灵',
+        hidden: false,
+        inserted: true,
+        occupants: ['ui-sprite'],
+        kind: 'shaped' as const,
+      },
+    ]))
+    const view = renderPanel({ listOverlayCards, setOverlayCardHidden, setOverlayCardInserted })
+    await waitFor(() => { expect(view.getByRole('status').textContent).toBe('已连接') })
+    fireEvent.click(view.container.querySelector('[data-cursor-agent-plugins-toggle]')!)
+    await waitFor(() => {
+      expect(view.container.querySelector('[data-cursor-agent-plugin-id="ui-sprite"]')).toBeTruthy()
+    })
+    expect(view.container.querySelector(
+      '[data-cursor-agent-plugin-id="ui-sprite"] [data-cursor-agent-plugin-hide]',
+    )).toBeTruthy()
+    expect(view.container.querySelector(
+      '[data-cursor-agent-plugin-id="ui-sprite"][data-cursor-agent-plugin-kind="shaped"]',
+    )).toBeTruthy()
+    expect(view.container.querySelector(
+      '[data-cursor-agent-plugin-id="ui-sprite"] [data-cursor-agent-plugin-unplug]',
+    )).toBeTruthy()
+    fireEvent.click(view.container.querySelector(
+      '[data-cursor-agent-plugin-id="ui-sprite"] [data-cursor-agent-plugin-hide]',
+    )!)
+    await waitFor(() => {
+      expect(setOverlayCardHidden).toHaveBeenCalledWith('ui-sprite', true, 'shaped')
+    })
+    expect(setOverlayCardInserted).not.toHaveBeenCalled()
+  })
+
   it('switches 拔出 to 插入 after unplug succeeds', async () => {
     const setOverlayCardInserted = vi.fn(async () => {})
     const listOverlayCards = vi.fn()

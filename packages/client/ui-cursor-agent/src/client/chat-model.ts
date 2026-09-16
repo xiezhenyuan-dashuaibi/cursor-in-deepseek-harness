@@ -62,6 +62,15 @@ const KNOWN_EVENT_TYPES = new Set([
   'usage',
 ])
 
+/** Long enough that a doubled snapshot is a real reply, not a two-token stutter. */
+const SNAPSHOT_UNIT_MIN = 32
+
+/**
+ * A sentence this long that appears again later is a restarted copy, even when
+ * the first copy opened with a different short lead-in.
+ */
+const REPEAT_SEGMENT_MIN = 16
+
 let nextTurnId = 1
 
 /**
@@ -102,7 +111,10 @@ export function messageText(message: unknown): string {
   for (const item of content) {
     if (typeof item !== 'object' || item === null) continue
     const text = (item as { text?: unknown }).text
-    if (typeof text === 'string') parts.push(text)
+    if (typeof text !== 'string') continue
+    const previous = parts[parts.length - 1]
+    if (previous !== undefined && text === previous && text.length >= SNAPSHOT_UNIT_MIN) continue
+    parts.push(text)
   }
   return parts.join('')
 }
@@ -121,11 +133,31 @@ export function isAssistantDelta(event: Record<string, unknown>): boolean {
 }
 
 /**
- * Join a later assistant payload onto text already shown for this user turn.
- * After thinking, tools, `system/task_notification`, or a CLI `--resume`,
- * Cursor often re-sends a prefix or a longer snapshot of the same message;
- * those must not open a second band.
- * @param existing - text already on the last assistant turn since the last user.
+ * Strip whitespace so GFM table padding still compares as the same reply.
+ * `--stream-partial-output` often re-emits one markdown snapshot with different
+ * pipe spacing; those must not concatenate into a doubled band.
+ */
+function compactAssistantText(text: string): string {
+  return text.replace(/\s+/gu, '')
+}
+
+/** True when `full` is `unit` written twice, raw or ignoring whitespace. */
+function isRepeatedTwice(full: string, unit: string): boolean {
+  if (unit.length < SNAPSHOT_UNIT_MIN) return false
+  if (full === unit + unit) return true
+  const compactFull = compactAssistantText(full)
+  const compactUnit = compactAssistantText(unit)
+  return compactUnit.length >= SNAPSHOT_UNIT_MIN && compactFull === compactUnit + compactUnit
+}
+
+/**
+ * Join a later assistant payload onto the trailing assistant row.
+ * A longer snapshot replaces, a replayed prefix or in-band chunk is ignored,
+ * a jammed copy and a pretty copy of the same opening replace with the later
+ * text, and a true delta appends. A later snapshot that shares two or more
+ * sentences with the trailing row replaces it even when the lead sentence
+ * differs. Callers only pass the last transcript row.
+ * @param existing - text already on the trailing assistant row.
  * @param incoming - text from this stream-json event.
  * @returns the surviving text.
  */
@@ -133,10 +165,259 @@ export function coalesceAssistantText(existing: string, incoming: string): strin
   if (incoming.length === 0) return existing
   if (existing.length === 0) return incoming
   if (incoming === existing) return existing
+  if (isRepeatedTwice(existing, incoming)) return incoming
+  if (isRepeatedTwice(incoming, existing)) return existing
   if (incoming.startsWith(existing)) return incoming
   if (existing.startsWith(incoming)) return existing
   if (incoming.length >= 8 && existing.includes(incoming)) return existing
+  if (existing.length >= 8 && incoming.includes(existing)) return incoming
+  const compactExisting = compactAssistantText(existing)
+  const compactIncoming = compactAssistantText(incoming)
+  if (compactIncoming.length === 0) return existing
+  if (compactExisting.length === 0) return incoming
+  if (compactIncoming === compactExisting) return incoming
+  if (compactIncoming.startsWith(compactExisting)) return incoming
+  if (compactExisting.startsWith(compactIncoming)) return existing
+  if (compactIncoming.length >= 8 && compactExisting.includes(compactIncoming)) return existing
+  if (compactExisting.length >= 8 && compactIncoming.includes(compactExisting)) return incoming
+  if (isRestartedSnapshot(existing, incoming)) return incoming
+  if (incoming.length >= SNAPSHOT_UNIT_MIN && mostlyCoveredBy(existing, incoming)) return incoming
   return existing + incoming
+}
+
+/**
+ * True when `incoming` is the same reply as `existing` restarted with different
+ * markdown (jammed pipes vs padded GFM). Neither string is a prefix of the other,
+ * so a concat would glue an unreadable draft in front of the pretty copy.
+ */
+function isRestartedSnapshot(existing: string, incoming: string): boolean {
+  const compactExisting = compactAssistantText(existing)
+  const compactIncoming = compactAssistantText(incoming)
+  if (
+    compactExisting.length < SNAPSHOT_UNIT_MIN
+    || compactIncoming.length < SNAPSHOT_UNIT_MIN
+  ) {
+    return false
+  }
+  if (compactExisting.slice(0, SNAPSHOT_UNIT_MIN) !== compactIncoming.slice(0, SNAPSHOT_UNIT_MIN)) {
+    return false
+  }
+  return !compactIncoming.startsWith(compactExisting) && !compactExisting.startsWith(compactIncoming)
+}
+
+/**
+ * True when at least two substantial sentences of `draft` appear in `later`.
+ * A unique short lead-in on a jammed copy does not block treating `later` as
+ * the same reply.
+ * @param draft - earlier assistant text.
+ * @param later - later assistant text.
+ * @returns true when `later` covers two or more substantial sentences of `draft`.
+ */
+function mostlyCoveredBy(draft: string, later: string): boolean {
+  const compactLater = compactAssistantText(later)
+  if (compactLater.length < SNAPSHOT_UNIT_MIN) return false
+  const units = substantialReplayUnits(draft)
+  /* v8 ignore next -- a repeating offset always leaves the first copy in the head. */
+  if (units.length === 0) return false
+  let hits = 0
+  for (const unit of units) {
+    if (compactLater.includes(unit)) hits += 1
+  }
+  return hits >= 2
+}
+
+/**
+ * Compact sentences long enough to identify a restarted copy.
+ * @param text - assistant text.
+ * @returns compact sentence units of at least {@link REPEAT_SEGMENT_MIN} characters.
+ */
+function substantialReplayUnits(text: string): string[] {
+  const units: string[] = []
+  for (const segment of splitAssistantSegments(text)) {
+    const compact = compactAssistantText(segment.trim())
+    if (compact.length >= REPEAT_SEGMENT_MIN) units.push(compact)
+  }
+  return units
+}
+
+/**
+ * Drop an earlier copy of the reply that restarts later in the same band.
+ * A compact prefix from the start of the band is the cut when that prefix
+ * appears again later. When the first copy opened with a different sentence,
+ * the cut is the later copy of the first sentence of at least 16 characters
+ * that appears again, if two or more sentences before that cut also appear
+ * after it.
+ * @param text - assistant text already joined onto one band.
+ * @returns the text with the earlier copy removed.
+ */
+export function collapseReplayedAssistantText(text: string): string {
+  if (text.length < SNAPSHOT_UNIT_MIN * 2) return text
+  const replayAt = findReplayOffset(text)
+  if (replayAt > 0 && replayAt < text.length) {
+    const tail = text.slice(replayAt).replace(/^\n+/u, '')
+    /* v8 ignore next -- a restart offset in range is never only newlines. */
+    if (tail.length === 0) return dropContainedSegments(text)
+    return collapseReplayedAssistantText(tail)
+  }
+  return dropContainedSegments(text)
+}
+
+/**
+ * Map a compact-string offset back onto `text`, skipping whitespace.
+ * @param text - original assistant text.
+ * @param compactOffset - index into {@link compactAssistantText} of `text`.
+ * @returns the matching original index, or `text.length` when the compact
+ *   offset is past the last non-whitespace character.
+ */
+function originalIndexAtCompactOffset(text: string, compactOffset: number): number {
+  let compact = 0
+  for (let index = 0; index < text.length; index += 1) {
+    const ch = text[index]
+    /* v8 ignore next -- the loop stays inside the string. */
+    if (ch === undefined) continue
+    if (/\s/u.test(ch)) continue
+    if (compact === compactOffset) return index
+    compact += 1
+  }
+  /* v8 ignore next -- compact indexOf yields an offset inside the string. */
+  return text.length
+}
+
+/**
+ * Offset where a leading sentence/paragraph run starts again later in `text`.
+ * Prefers the longest compact prefix from the start so a same-opening pretty
+ * copy keeps its short lead-in. Falls back to a later copy of a sentence that
+ * is not the opening of `text`.
+ * @param text - one assistant band.
+ * @returns the later start index, or -1.
+ */
+function findReplayOffset(text: string): number {
+  const segments = splitAssistantSegments(text)
+  const compactText = compactAssistantText(text)
+  let acc = 0
+  let bestLen = 0
+  let bestAt = -1
+  for (const segment of segments) {
+    acc += segment.length
+    if (acc < SNAPSHOT_UNIT_MIN || acc >= text.length) continue
+    const prefix = text.slice(0, acc)
+    const later = text.indexOf(prefix, acc)
+    if (later >= 0 && acc >= bestLen) {
+      bestLen = acc
+      bestAt = later
+    }
+    const compactPrefix = compactAssistantText(prefix)
+    if (compactPrefix.length < SNAPSHOT_UNIT_MIN) continue
+    const laterCompact = compactText.indexOf(compactPrefix, compactPrefix.length)
+    if (laterCompact < 0) continue
+    const original = originalIndexAtCompactOffset(text, laterCompact)
+    /* v8 ignore next -- compact indexOf yields an in-range original index. */
+    if (original >= text.length) continue
+    bestLen = acc
+    bestAt = original
+  }
+  if (segments.length <= 1) {
+    const mid = Math.floor(text.length / 2)
+    const head = text.slice(0, mid)
+    const tail = text.slice(mid)
+    if (head.length >= SNAPSHOT_UNIT_MIN && tail.includes(head)) return mid
+    const compactHead = compactAssistantText(head)
+    if (
+      compactHead.length >= SNAPSHOT_UNIT_MIN
+      && compactAssistantText(tail).includes(compactHead)
+    ) {
+      return mid
+    }
+  }
+  if (bestAt >= 0) return bestAt
+  const repeating = findRepeatingSegmentOffset(text)
+  if (repeating > 0) {
+    const tail = text.slice(repeating)
+    if (mostlyCoveredBy(text.slice(0, repeating), tail)) return repeating
+  }
+  return -1
+}
+
+/**
+ * Second occurrence of the first sentence/paragraph that is long enough to
+ * mark a restarted copy. The first copy may open with a different short lead.
+ * @param text - one assistant band.
+ * @returns the later start index, or -1.
+ */
+function findRepeatingSegmentOffset(text: string): number {
+  const segments = splitAssistantSegments(text)
+  let pos = 0
+  for (const segment of segments) {
+    pos += segment.length
+    const unit = segment.trim()
+    if (unit.length < REPEAT_SEGMENT_MIN) continue
+    const later = text.indexOf(unit, pos)
+    if (later >= 0) return later
+    const compactUnit = compactAssistantText(unit)
+    if (compactUnit.length < REPEAT_SEGMENT_MIN) continue
+    const compactText = compactAssistantText(text)
+    const first = compactText.indexOf(compactUnit)
+    /* v8 ignore next -- a trimmed segment's compact form is always in the compact band. */
+    if (first < 0) continue
+    const second = compactText.indexOf(compactUnit, first + compactUnit.length)
+    if (second < 0) continue
+    return originalIndexAtCompactOffset(text, second)
+  }
+  return -1
+}
+
+/**
+ * Drop a middle sentence/paragraph that still appears later after a restart cut.
+ * @param text - assistant text.
+ * @returns text with contained units removed.
+ */
+function dropContainedSegments(text: string): string {
+  const segments = splitAssistantSegments(text)
+  if (segments.length <= 1) return text
+  const kept: string[] = []
+  for (let index = 0; index < segments.length; index += 1) {
+    const segment = segments[index]
+    /* v8 ignore next -- the loop stays inside the split array. */
+    if (segment === undefined) continue
+    const later = segments.slice(index + 1).join('')
+    const trimmed = segment.trim()
+    if (trimmed.length >= SNAPSHOT_UNIT_MIN && later.includes(trimmed)) continue
+    const compactSeg = compactAssistantText(trimmed)
+    if (
+      compactSeg.length >= SNAPSHOT_UNIT_MIN
+      && compactAssistantText(later).includes(compactSeg)
+    ) {
+      continue
+    }
+    kept.push(segment)
+  }
+  return kept.join('').replace(/^\n+/u, '')
+}
+
+/** Paragraph, line, and sentence ends that bound one replay unit. */
+const ASSISTANT_SEGMENT_END = /。|！|？|\n+|[.!?](?=\s)\s*/gu
+
+/**
+ * Split assistant text into sentence/paragraph units, keeping each delimiter
+ * on the preceding unit so a dropped copy does not leave a stray period.
+ * @param text - one assistant band.
+ * @returns non-empty segments in order.
+ */
+function splitAssistantSegments(text: string): string[] {
+  const segments: string[] = []
+  let last = 0
+  for (const match of text.matchAll(ASSISTANT_SEGMENT_END)) {
+    const start = match.index
+    /* v8 ignore next -- matchAll yields a defined index. */
+    if (start === undefined) continue
+    const end = start + match[0].length
+    /* v8 ignore next -- the regex always advances. */
+    if (end <= last) continue
+    segments.push(text.slice(last, end))
+    last = end
+  }
+  if (last < text.length) segments.push(text.slice(last))
+  return segments
 }
 
 /**
@@ -343,9 +624,10 @@ export function foldCursorEvent(state: ChatFold, event: Record<string, unknown>)
 }
 
 /**
- * Mark any trailing streaming assistant or thinking band as settled.
+ * Mark trailing streaming bands settled, collapse replayed assistant segments,
+ * and mark leftover running tools done.
  * @param state - current fold.
- * @returns the fold with streaming flags cleared.
+ * @returns the fold with streaming flags cleared and replayed copies dropped.
  */
 export function settleStreaming(state: ChatFold): ChatFold {
   return withTurns(state, settleStreamingTurns(state.turns))
@@ -355,62 +637,79 @@ function foldAssistant(state: ChatFold, event: Record<string, unknown>): ChatFol
   const text = messageText(event.message)
   if (text.length === 0) return state
   const delta = isAssistantDelta(event)
-  const index = lastAssistantIndexSinceUser(state.turns)
-  if (index < 0) {
-    return withTurns(state, [...state.turns, {
-      id: mintTurnId(),
-      role: 'assistant',
-      text,
-      ...(delta ? { streaming: true } : {}),
-    }])
+  const last = state.turns.at(-1)
+  if (last?.role === 'assistant') {
+    return joinTrailingAssistant(state, last, text, delta)
   }
-  const last = state.turns[index]
-  /* v8 ignore next -- index comes from a reverse scan of this array. */
-  if (last === undefined || last.role !== 'assistant') return state
-  if (delta && index === state.turns.length - 1 && last.streaming === true) {
-    const nextText = coalesceAssistantText(last.text, text)
-    if (nextText === last.text) return state
-    const next = [...state.turns]
-    next[index] = {
-      id: last.id,
-      role: 'assistant',
-      text: nextText,
-      streaming: true,
-    }
-    return withTurns(state, next)
-  }
-  if (
-    !delta
-    && !text.startsWith(last.text)
-    && !last.text.startsWith(text)
-    && !(text.length >= 8 && last.text.includes(text))
-  ) {
-    return withTurns(state, [...state.turns, { id: mintTurnId(), role: 'assistant', text }])
-  }
-  const nextText = coalesceAssistantText(last.text, text)
-  if (nextText === last.text && delta === (last.streaming === true)) return state
-  const next = [...state.turns]
-  next[index] = delta
-    ? { id: last.id, role: 'assistant', text: nextText, streaming: true }
-    : { id: last.id, role: 'assistant', text: nextText }
-  return withTurns(state, next)
+  const next: ChatTurn[] = [...state.turns, {
+    id: mintTurnId(),
+    role: 'assistant',
+    text: collapseReplayedAssistantText(text),
+    ...(delta ? { streaming: true } : {}),
+  }]
+  const ordered = delta ? next : settleThinkingTurns(next)
+  return withTurns(state, dropSupersededAssistantBands(ordered))
 }
 
 /**
- * Index of the latest assistant band after the most recent user turn.
- * Thinking, tools, and system notices do not start a new user turn.
- * @param turns - current transcript.
- * @returns the index, or -1 when this user turn has no assistant yet.
+ * Join onto the live last row only. Thinking/tools already below that row stay
+ * above any later assistant band; writing into an earlier assistant slot would
+ * paint those steps under the answer.
+ * @param state - current fold.
+ * @param last - the trailing assistant row.
+ * @param text - incoming assistant text.
+ * @param delta - whether this event is a live stream-json delta.
+ * @returns the next fold.
  */
-function lastAssistantIndexSinceUser(turns: readonly ChatTurn[]): number {
-  for (let index = turns.length - 1; index >= 0; index -= 1) {
-    const turn = turns[index]
-    /* v8 ignore next -- reverse scan stays inside the array bounds. */
-    if (turn === undefined) return -1
-    if (turn.role === 'user') return -1
-    if (turn.role === 'assistant') return index
+function joinTrailingAssistant(
+  state: ChatFold,
+  last: Extract<ChatTurn, { role: 'assistant' }>,
+  text: string,
+  delta: boolean,
+): ChatFold {
+  const index = state.turns.length - 1
+  const joined = coalesceAssistantText(last.text, text)
+  if (!delta && joined === last.text + text) {
+    const collapsedJoin = collapseReplayedAssistantText(joined)
+    if (collapsedJoin !== joined) {
+      return finalizeCompleteAssistant(state, index, collapsedJoin)
+    }
+    const next = [...state.turns]
+    if (last.streaming === true) {
+      next[index] = { id: last.id, role: 'assistant', text: last.text }
+    }
+    next.push({
+      id: mintTurnId(),
+      role: 'assistant',
+      text: collapseReplayedAssistantText(text),
+    })
+    return withTurns(state, dropSupersededAssistantBands(settleThinkingTurns(next)))
   }
-  return -1
+  if (delta) {
+    if (joined === last.text && last.streaming === true) return state
+    const next = [...state.turns]
+    next[index] = { id: last.id, role: 'assistant', text: joined, streaming: true }
+    return withTurns(state, dropSupersededAssistantBands(next))
+  }
+  if (joined === last.text && last.streaming !== true) return state
+  return finalizeCompleteAssistant(state, index, joined)
+}
+
+/**
+ * Write a finished assistant payload, clear thinking "running", and drop an
+ * earlier band whose text appears in a later assistant band of this user turn.
+ */
+function finalizeCompleteAssistant(
+  state: ChatFold,
+  index: number,
+  text: string,
+): ChatFold {
+  const last = state.turns[index]
+  /* v8 ignore next -- callers pass the last assistant index. */
+  if (last === undefined || last.role !== 'assistant') return state
+  const turns = [...state.turns]
+  turns[index] = { id: last.id, role: 'assistant', text }
+  return withTurns(state, dropSupersededAssistantBands(settleThinkingTurns(turns)))
 }
 
 function foldThinking(state: ChatFold, event: Record<string, unknown>): ChatFold {
@@ -580,10 +879,79 @@ function clipHint(value: string): string {
 }
 
 function settleStreamingTurns(turns: readonly ChatTurn[]): ChatTurn[] {
-  return turns.map((turn) => {
-    if (turn.role === 'assistant' && turn.streaming) {
-      return { id: turn.id, role: 'assistant', text: turn.text }
+  return dropSupersededAssistantBands(settleThinkingTurns(turns.map((turn) => {
+    if (turn.role === 'assistant') {
+      const text = collapseReplayedAssistantText(turn.text)
+      if (turn.streaming === true || text !== turn.text) {
+        return { id: turn.id, role: 'assistant' as const, text }
+      }
+      return turn
     }
+    if (turn.role === 'tool' && turn.status === 'running') {
+      return { ...turn, status: 'done' as const }
+    }
+    return turn
+  })))
+}
+
+/**
+ * Drop an earlier assistant band in this user turn when a later band is the
+ * same reply (pretty snapshot, padded table, or identical replay).
+ * Thinking and tool rows keep their event order.
+ * @param turns - current transcript.
+ * @returns turns with superseded assistant drafts removed.
+ */
+function dropSupersededAssistantBands(turns: readonly ChatTurn[]): ChatTurn[] {
+  let lastUser = -1
+  for (let index = 0; index < turns.length; index += 1) {
+    if (turns[index]?.role === 'user') lastUser = index
+  }
+  const assistants: number[] = []
+  for (let index = lastUser + 1; index < turns.length; index += 1) {
+    if (turns[index]?.role === 'assistant') assistants.push(index)
+  }
+  if (assistants.length < 2) return [...turns]
+  const drop = new Set<number>()
+  for (let earlierPos = 0; earlierPos < assistants.length; earlierPos += 1) {
+    const earlierIndex = assistants[earlierPos]
+    /* v8 ignore next -- assistants collects in-range indexes. */
+    if (earlierIndex === undefined) continue
+    const earlier = turns[earlierIndex]
+    /* v8 ignore next -- assistants is filtered to assistant rows. */
+    if (earlier?.role !== 'assistant') continue
+    for (let laterPos = earlierPos + 1; laterPos < assistants.length; laterPos += 1) {
+      const laterIndex = assistants[laterPos]
+      /* v8 ignore next -- assistants collects in-range indexes. */
+      if (laterIndex === undefined) continue
+      const later = turns[laterIndex]
+      /* v8 ignore next -- assistants is filtered to assistant rows. */
+      if (later?.role !== 'assistant') continue
+      if (!isSupersededAssistantDraft(earlier.text, later.text)) continue
+      drop.add(earlierIndex)
+      break
+    }
+  }
+  if (drop.size === 0) return [...turns]
+  return turns.filter((_, index) => !drop.has(index))
+}
+
+/** True when `later` is the same reply as `draft` and should keep only `later`. */
+function isSupersededAssistantDraft(draft: string, later: string): boolean {
+  if (later === draft) return true
+  if (draft.length > 0 && later.startsWith(draft)) return true
+  if (draft.length >= SNAPSHOT_UNIT_MIN && later.includes(draft)) return true
+  const compactDraft = compactAssistantText(draft)
+  const compactLater = compactAssistantText(later)
+  if (compactDraft.length > 0 && compactLater.startsWith(compactDraft)) return true
+  if (compactDraft.length >= SNAPSHOT_UNIT_MIN && compactLater.includes(compactDraft)) return true
+  if (isRestartedSnapshot(draft, later)) return true
+  if (later.length >= SNAPSHOT_UNIT_MIN && mostlyCoveredBy(draft, later)) return true
+  return collapseReplayedAssistantText(`${draft}\n\n${later}`)
+    === collapseReplayedAssistantText(later)
+}
+
+function settleThinkingTurns(turns: readonly ChatTurn[]): ChatTurn[] {
+  return turns.map((turn) => {
     if (turn.role === 'thinking' && turn.streaming) {
       return { id: turn.id, role: 'thinking', text: turn.text }
     }

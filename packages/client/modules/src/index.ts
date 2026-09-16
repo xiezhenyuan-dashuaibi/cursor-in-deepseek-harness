@@ -18,7 +18,7 @@
  * first miss can still join the graph. Bundle content changes reach the
  * graph only through {@link ClientModuleRegistry.rebuilt}.
  * `dsh.client.overlayBody` is optional metadata for the plugin rail and
- * `overlay:live` exclusive insert. An unknown string value does not fail
+ * `overlay:live` host binding. An unknown string value does not fail
  * composition: the Node half of this process is the first import for the
  * process lifetime, and a newer slot name must still join {@link WebBootGraph}.
  * @module @deepseek-ai/dsh-client-modules
@@ -53,12 +53,12 @@ interface DshClientDeclaration {
   platform: string
   /** Boot phase-one prefetch mark; absent means lazy (fetched on demand). */
   immediately?: boolean
-  /** Overlay body slot this page occupies when the string is a known card or desktop slot. */
+  /** Overlay body slot this page occupies when the string is a known card, desktop, or shaped slot. */
   overlayBody?: string
 }
 
-/** `overlay-card.body`, `overlay-card-N.body` for N ≥ 2, or `overlay-desktop.body`. */
-const OVERLAY_BODY_SLOT = /^(overlay-card(?:-(?:[2-9]|[1-9]\d+))?\.body|overlay-desktop\.body)$/
+/** `overlay-card.body`, `overlay-card-N.body` for N ≥ 2, `overlay-desktop.body`, or `overlay-shaped.body`. */
+const OVERLAY_BODY_SLOT = /^(overlay-card(?:-(?:[2-9]|[1-9]\d+))?\.body|overlay-desktop\.body|overlay-shaped\.body)$/
 
 /** Resolved package metadata for one `dsh.client` package (cached per name, never expires). */
 interface PkgMeta {

@@ -17,8 +17,10 @@ export {
   listStandaloneOverlayPlugins, OVERLAY_DESKTOP_BODY_SLOT, OVERLAY_DESKTOP_PACKAGE_NAME,
   OVERLAY_PLUGIN_LIST_ENDPOINT, OVERLAY_PLUGIN_RAIL_RPC_CHANNEL, OVERLAY_PLUGIN_RAIL_RPC_ID,
   OVERLAY_PLUGIN_RPC_CHANNEL, OVERLAY_PLUGIN_ROSTER_RPC_ID,
-  OVERLAY_PLUGIN_SET_INSERTED_ENDPOINT, OVERLAY_PLUGIN_SWITCH_DESKTOP_ENDPOINT, resolveRosterPaths,
-  setDesktopOccupantExclusive, setOverlayRailPluginInserted, setStandaloneOverlayPluginInserted,
+  OVERLAY_PLUGIN_SET_HIDDEN_ENDPOINT, OVERLAY_PLUGIN_SET_INSERTED_ENDPOINT,
+  OVERLAY_PLUGIN_SWITCH_DESKTOP_ENDPOINT, OVERLAY_SHAPED_BODY_SLOT, OVERLAY_SHAPED_HIDDEN_FILE,
+  OVERLAY_SHAPED_PACKAGE_NAME, resolveRosterPaths, setDesktopOccupantExclusive,
+  setOverlayRailPluginHidden, setOverlayRailPluginInserted, setStandaloneOverlayPluginInserted,
 } from './plugin-roster.ts'
 export type {
   OverlayPluginRosterOptions, OverlayRailKind, OverlayRailRoster, OverlayStandalonePlugin,

@@ -1,0 +1,14 @@
+/* Full-board seat. Hits pass through empty space; occupant silhouettes keep
+   pointer-events. Translate is the persisted drag offset. Hidden seats keep
+   the occupant mounted (`visibility`, not `display: none`) so an iframe can
+   keep playing. */
+.seat {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.seatHidden {
+  visibility: hidden;
+  pointer-events: none;
+}

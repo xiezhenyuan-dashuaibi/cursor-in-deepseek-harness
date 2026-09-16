@@ -12,7 +12,7 @@ The Cursor rail 插件 list read only `/overlay-card` `instances.list`. A live p
 
 The rail merges two rosters. Cards stay on `/overlay-card` (`instances.list` / `instances.setHidden` / `occupants.setInserted`) and never enter this new channel. Overlay fibers and desktop occupants use `/overlay-plugins` (`plugins.list` returns `{ desktop, plugins }`; `plugins.setInserted`; `plugins.switchDesktop`). Live recovery when that handler still lists the desktop board as a fiber uses `/overlay-plugins-rail`.
 
-A standalone fiber is a live **profile** Loader row whose `plugins/<id>/package.json` has `dsh.client`, has no `overlayBody`, and is not a protected id (`ui-float-window`, `ui-overlay-desktop`, `ui-cursor-agent` / `cursor-agent`, overlay-card RPC ids, `overlay-plugin-roster-rpc`, `overlay-plugin-rail-rpc`). The desktop board is also skipped by npm name `@deepseek-ai/dsh-client-ui-overlay-desktop`. A desktop occupant is the same scan with `overlayBody: overlay-desktop.body`. Title is `dsh.client.panelTitle` when that string is non-empty, otherwise the Loader id. Bundle DSH chrome is not listed. The inserted occupant is not repeated in the lower list.
+A standalone fiber is a live **profile** Loader row whose `plugins/<id>/package.json` has `dsh.client`, has no `overlayBody`, and is not a protected id (`ui-float-window`, `ui-overlay-desktop`, `ui-overlay-shaped`, `ui-cursor-agent` / `cursor-agent`, overlay-card RPC ids, `overlay-plugin-roster-rpc`, `overlay-plugin-rail-rpc`). The desktop board is also skipped by npm name `@deepseek-ai/dsh-client-ui-overlay-desktop`. The shaped board is skipped by npm name `@deepseek-ai/dsh-client-ui-overlay-shaped`. A desktop occupant is the same scan with `overlayBody: overlay-desktop.body`. A shaped occupant is the same scan with `overlayBody: overlay-shaped.body` and lists as `shaped` (hide plus unplug; [shaped hide](2026-09-14-overlay-shaped-hide.md)). Title is `dsh.client.panelTitle` when that string is non-empty, otherwise the Loader id. Bundle DSH chrome is not listed. The inserted occupant is not repeated in the lower list.
 
 For a fiber, 拔出 writes that row's Loader `disabled`. The rail does not offer hide on fiber or desktop rows. Desktop occupancy, exclusive enable, and the pinned 桌面 row stay on [desktop host](2026-09-10-overlay-desktop-host.md). The desk poll stays on `instances.list` so a backdrop cannot become a card.
 
@@ -22,9 +22,9 @@ Host `apply` of `@deepseek-ai/dsh-client-ui-cursor-agent` is cached for the proc
 
 **Append standalone fibers to `instances.list` `cards`.** Rejected — the desk polls that same RPC and would mount a fake window.
 
-**Occupy `overlay-card.body` so a backdrop becomes a card.** Rejected — a click-through desktop page occupies `overlay-desktop.body`; shaped HOW stays reserved.
+**Occupy `overlay-card.body` so a backdrop becomes a card.** Rejected — a click-through desktop page occupies `overlay-desktop.body`; a non-card outline occupies `overlay-shaped.body`.
 
-**A hide file for fibers, distinct from Loader `disabled`.** Rejected — fibers have no hide flag; the rail offers 插入/拔出 only. Desktop products also have no hide file ([desktop host](2026-09-10-overlay-desktop-host.md)).
+**A hide file for fibers, distinct from Loader `disabled`.** Rejected for generic fibers — those rows have no hide flag; the rail offers 插入/拔出 only. Desktop products also have no hide file ([desktop host](2026-09-10-overlay-desktop-host.md)). Shaped occupants use host `hidden.json` ([shaped hide](2026-09-14-overlay-shaped-hide.md)).
 
 **List every Loader row, including bundle chrome.** Rejected — the panel is the live overlay roster, not `ui-conversation` and other shipped DSH seats.
 
@@ -38,4 +38,4 @@ A live standalone overlay fiber appears in 插件 next to card windows and unloa
 
 ## Testing
 
-`packages/client/ui-cursor-agent/tests/plugin-roster.spec.ts` pins list filter, yaml `disabled`, exclusive desktop enable, host npm-name exclusion, and `/overlay-plugins` list/unplug/switchDesktop. `overlay-card-rpc.spec.ts` pins `kind: 'card'` on mapped cards, desktop flattening, hide rejected on fiber/desktop, merge/unplug routing, and `/overlay-plugins-rail` first. `cursor-panel.client.spec.tsx` pins the pinned 桌面 row, 卸下, 切换桌面, and a fiber row without hide. `browser-plugin.client.spec.ts` pins the merged list call and `switchOverlayDesktop`. `scripts/overlay-live-plugin.spec.ts` pins insert and update writing `./overlay-plugin-roster-rpc.mjs` and `./overlay-plugin-rail-rpc.mjs`.
+`packages/client/ui-cursor-agent/tests/plugin-roster.spec.ts` pins list filter, yaml `disabled`, exclusive desktop enable, host npm-name exclusion, and `/overlay-plugins` list/unplug/switchDesktop. `overlay-card-rpc.spec.ts` pins `kind: 'card'` on mapped cards, desktop flattening, hide rejected on fiber/desktop, merge/unplug routing, and `/overlay-plugins-rail` first. `cursor-panel.client.spec.tsx` pins the pinned 桌面 row, 卸下, 切换桌面, a fiber row without hide, and a shaped row with hide. `browser-plugin.client.spec.ts` pins the merged list call and `switchOverlayDesktop`. `scripts/overlay-live-plugin.spec.ts` pins insert and update writing `./overlay-plugin-roster-rpc.mjs` and `./overlay-plugin-rail-rpc.mjs`. Shaped hide coverage lives in [shaped hide](2026-09-14-overlay-shaped-hide.md).

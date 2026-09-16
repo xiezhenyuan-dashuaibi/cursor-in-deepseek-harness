@@ -45,6 +45,7 @@ import {
   parseOverlayCardInstances,
 } from '../packages/client/ui-float-window/src/instances.ts'
 import { OVERLAY_DESKTOP_PACKAGE_NAME } from '../packages/client/ui-overlay-desktop/src/desktop.ts'
+import { OVERLAY_SHAPED_PACKAGE_NAME } from '../packages/client/ui-overlay-shaped/src/shaped.ts'
 
 const temps: string[] = []
 
@@ -208,6 +209,15 @@ describe('overlay-live-plugin', () => {
     expect(await readFile(join(profile, 'overlay-plugin-roster-rpc.mjs'), 'utf8')).toContain('overlayBody')
     expect(await readFile(join(profile, 'overlay-plugin-rail-rpc.mjs'), 'utf8')).toContain('/overlay-plugins-rail')
     expect(await readFile(join(profile, 'overlay-plugin-rail-rpc.mjs'), 'utf8')).toContain('HOST_NAME')
+    expect(await readFile(join(profile, 'overlay-plugin-rail-rpc.mjs'), 'utf8')).toContain('SHAPED_BODY')
+    expect(await readFile(join(profile, 'overlay-plugin-rail-rpc.mjs'), 'utf8')).toContain('SHAPED_PKG')
+    expect(await readFile(join(profile, 'overlay-plugin-rail-rpc.mjs'), 'utf8')).toContain('plugins.setHidden')
+    expect(await readFile(join(profile, 'overlay-plugin-rail-rpc.mjs'), 'utf8')).toContain("return 'shaped'")
+    expect(await readFile(join(profile, 'overlay-plugin-rail-rpc.mjs'), 'utf8')).toContain(
+      'if (pkg.name === SHAPED_PKG) return undefined',
+    )
+    expect(await readFile(join(profile, 'overlay-plugin-rail-rpc.mjs'), 'utf8')).toContain("'ui-overlay-shaped'")
+    expect(await readFile(join(profile, 'overlay-plugin-rail-rpc.mjs'), 'utf8')).not.toContain('SHAPED_HOST')
     const destManifest = JSON.parse(await readFile(join(profile, 'plugins', 'demo', 'package.json'), 'utf8')) as {
       dependencies?: unknown
     }
@@ -777,6 +787,68 @@ describe('overlay-live-plugin', () => {
     })
     expect(existsSync(join(profile, 'plugins', 'ui-overlay-desktop', 'instances.json'))).toBe(false)
     expect(existsSync(join(profile, 'plugins', 'ui-float-window'))).toBe(false)
+  })
+
+  it('refuses a shaped occupant when the shaped host is missing', async () => {
+    const home = tempDir()
+    await seedProfile(home)
+    const page = join(home, 'checkout', 'ui-sprite')
+    await seedCheckout(page, {
+      name: '@deepseek-ai/dsh-client-ui-sprite',
+      overlayBody: 'overlay-shaped.body',
+    })
+    await expect(runOverlayLivePlugin(['insert', page], {
+      home, profile: 'web', install: () => undefined,
+    })).rejects.toThrow(/overlay shaped plugin is not loaded/)
+  })
+
+  it('is a no-op on repeat shaped-host insert and keeps both shaped occupants enabled', async () => {
+    const home = tempDir()
+    const profile = await seedProfile(home)
+    const host = join(home, 'checkout', 'ui-overlay-shaped')
+    await seedCheckout(host, { name: OVERLAY_SHAPED_PACKAGE_NAME })
+    await runOverlayLivePlugin(['insert', host], {
+      home, profile: 'web', install: () => undefined,
+    })
+    const repeat = await runOverlayLivePlugin(['insert', host], {
+      home,
+      profile: 'web',
+      install: () => {
+        throw new Error('must not install when the shaped host is already inserted')
+      },
+    })
+    expect(repeat).toMatch(/shaped host already inserted/)
+    const first = join(home, 'checkout', 'ui-sprite')
+    await seedCheckout(first, {
+      name: '@deepseek-ai/dsh-client-ui-sprite',
+      overlayBody: 'overlay-shaped.body',
+    })
+    await runOverlayLivePlugin(['insert', first], {
+      home, profile: 'web', install: () => undefined,
+    })
+    const second = join(home, 'checkout', 'ui-other-shape')
+    await seedCheckout(second, {
+      name: '@deepseek-ai/dsh-client-ui-other-shape',
+      overlayBody: 'overlay-shaped.body',
+    })
+    await runOverlayLivePlugin(['insert', second], {
+      home, profile: 'web', install: () => undefined,
+    })
+    const yaml = await readFile(join(profile, 'cordis.patch.yml'), 'utf8')
+    const parsed = parseProfilePatch(yaml)
+    expect(findInsertRowByName(parsed.entries, '@deepseek-ai/dsh-client-ui-sprite')).toEqual({
+      id: 'ui-sprite',
+      name: '@deepseek-ai/dsh-client-ui-sprite',
+    })
+    expect(findInsertRowByName(parsed.entries, '@deepseek-ai/dsh-client-ui-other-shape')).toEqual({
+      id: 'ui-other-shape',
+      name: '@deepseek-ai/dsh-client-ui-other-shape',
+    })
+    expect(findInsertRowByName(parsed.entries, OVERLAY_SHAPED_PACKAGE_NAME)).toEqual({
+      id: 'ui-overlay-shaped',
+      name: OVERLAY_SHAPED_PACKAGE_NAME,
+    })
+    expect(existsSync(join(profile, 'plugins', 'ui-overlay-shaped', 'instances.json'))).toBe(false)
   })
 
   it('round-trips disabled: true so a later insert does not re-enable the row', () => {

@@ -442,7 +442,7 @@ export interface OverlayPluginRosterOptions {
 }
 ```
 
-Source: [`packages/client/ui-cursor-agent/src/plugin-roster.ts:91`](../packages/client/ui-cursor-agent/src/plugin-roster.ts)
+Source: [`packages/client/ui-cursor-agent/src/plugin-roster.ts:110`](../packages/client/ui-cursor-agent/src/plugin-roster.ts)
 
 <a id="deepseek-aidsh-client-ui-float-window"></a>
 
@@ -460,7 +460,7 @@ export interface OverlayCardHostOptions {
 }
 ```
 
-Source: [`packages/client/ui-float-window/src/index.ts:61`](../packages/client/ui-float-window/src/index.ts)
+Source: [`packages/client/ui-float-window/src/index.ts:62`](../packages/client/ui-float-window/src/index.ts)
 
 <a id="deepseek-aidsh-code-runtime-worker-thread"></a>
 
@@ -644,7 +644,7 @@ export interface CursorAgentGatewayConfig {
 }
 ```
 
-Source: [`packages/cursor/agent-gateway/src/index.ts:78`](../packages/cursor/agent-gateway/src/index.ts)
+Source: [`packages/cursor/agent-gateway/src/index.ts:85`](../packages/cursor/agent-gateway/src/index.ts)
 
 <a id="deepseek-aidsh-cursor-mcp-server"></a>
 
@@ -660,7 +660,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/cursor/mcp-server/src/index.ts:55`](../packages/cursor/mcp-server/src/index.ts)
+Source: [`packages/cursor/mcp-server/src/index.ts:67`](../packages/cursor/mcp-server/src/index.ts)
 
 <a id="deepseek-aidsh-e2b"></a>
 
@@ -3133,6 +3133,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-deliverables` — requires `systemPrompt` ([`packages/client/ui-deliverables/src/index.ts`](../packages/client/ui-deliverables/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-directory-picker-browse` ([`packages/client/ui-directory-picker-browse/src/index.ts`](../packages/client/ui-directory-picker-browse/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-directory-picker-native` ([`packages/client/ui-directory-picker-native/src/index.ts`](../packages/client/ui-directory-picker-native/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-flower-pot` ([`packages/client/ui-flower-pot/src/index.ts`](../packages/client/ui-flower-pot/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-goal` ([`packages/client/ui-goal/src/index.ts`](../packages/client/ui-goal/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-input-trigger` ([`packages/client/ui-input-trigger/src/index.ts`](../packages/client/ui-input-trigger/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-jobs` ([`packages/client/ui-jobs/src/index.ts`](../packages/client/ui-jobs/src/index.ts))
@@ -3140,6 +3141,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-message-feedback` ([`packages/client/ui-message-feedback/src/index.ts`](../packages/client/ui-message-feedback/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-model-selection` ([`packages/client/ui-model-selection/src/index.ts`](../packages/client/ui-model-selection/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-overlay-desktop` ([`packages/client/ui-overlay-desktop/src/index.ts`](../packages/client/ui-overlay-desktop/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-overlay-shaped` ([`packages/client/ui-overlay-shaped/src/index.ts`](../packages/client/ui-overlay-shaped/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-permission-presets` ([`packages/client/ui-permission-presets/src/index.ts`](../packages/client/ui-permission-presets/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-plan` ([`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings` ([`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts))
@@ -3150,6 +3152,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-sidebar` ([`packages/client/ui-sidebar/src/index.ts`](../packages/client/ui-sidebar/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-skill` ([`packages/client/ui-skill/src/index.ts`](../packages/client/ui-skill/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-subagent` ([`packages/client/ui-subagent/src/index.ts`](../packages/client/ui-subagent/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-television` ([`packages/client/ui-television/src/index.ts`](../packages/client/ui-television/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-theme` ([`packages/client/ui-theme/src/index.ts`](../packages/client/ui-theme/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-tool` ([`packages/client/ui-tool/src/index.ts`](../packages/client/ui-tool/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-trajectory` ([`packages/client/ui-trajectory/src/index.ts`](../packages/client/ui-trajectory/src/index.ts))

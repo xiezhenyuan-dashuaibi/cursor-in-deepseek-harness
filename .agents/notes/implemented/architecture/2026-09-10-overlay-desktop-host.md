@@ -36,7 +36,7 @@ The Cursor rail pins a **桌面** row at the top: the inserted occupant (`panelT
 
 ## Consequences
 
-Inserting the host then a desktop page paints under cards and Cursor without stealing hits. Inserting another desktop page pauses the previous occupant fiber. The rail 桌面 row unloads that fiber; switching desktops exclusive-enables the chosen occupant. Checkout stays. Arbitrary-shape HOW stays reserved.
+Inserting the host then a desktop page paints under cards and Cursor without stealing hits. Inserting another desktop page pauses the previous occupant fiber. The rail 桌面 row unloads that fiber; switching desktops exclusive-enables the chosen occupant. Checkout stays. Arbitrary-shape occupant insert is [overlay new shaped](../process/2026-09-14-overlay-new-shaped.md); the shaped board is [shaped host](2026-09-14-overlay-shaped-host.md).
 
 ## Testing
 

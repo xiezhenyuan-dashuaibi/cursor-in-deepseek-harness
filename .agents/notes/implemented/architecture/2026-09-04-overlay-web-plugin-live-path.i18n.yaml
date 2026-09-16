@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-04-overlay-web-plugin-live-path.md
-2026-09-04-overlay-web-plugin-live-path.md: 7828ad6d457131ac83413e37c9439e012e4071cf
-2026-09-04-overlay-web-plugin-live-path.zh.md: 2701a3f9ba54419144fcc96bb9f62081e6e88a0a
+2026-09-04-overlay-web-plugin-live-path.md: 60e7ed1cdcf6eeb619346a43cf65de22b619c93a
+2026-09-04-overlay-web-plugin-live-path.zh.md: a0614f364c230b431de7486ed6c3564918a78626

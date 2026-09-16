@@ -18,10 +18,10 @@ export type PluginManagerProps = {
   /** Merged card, desktop, and standalone-fiber roster. */
   listOverlayCards: () => Promise<readonly OverlayCardManagerItem[]>
   /**
-   * Write `hidden` on one card. Fiber and desktop rows have no hide.
+   * Write `hidden` on one card or shaped occupant. Fiber and desktop rows have no hide.
    * @param id - unique card id or Loader id.
-   * @param hidden - `true` skips the window.
-   * @param kind - `card` writes `instances.json`.
+   * @param hidden - `true` skips the window or hides the silhouette.
+   * @param kind - `card` writes `instances.json`; `shaped` writes host `hidden.json`.
    */
   setOverlayCardHidden: (
     id: string,
@@ -223,7 +223,12 @@ export function PluginPanel({
       ) : (
         <ul className={css.pluginList}>
           {list.map(card => (
-            <li key={card.id} className={css.pluginRow} data-cursor-agent-plugin-id={card.id}>
+            <li
+              key={card.id}
+              className={css.pluginRow}
+              data-cursor-agent-plugin-id={card.id}
+              data-cursor-agent-plugin-kind={card.kind ?? 'card'}
+            >
               <div className={css.pluginIdentity}>
                 <span className={css.pluginName}>{card.title}</span>
                 <span className={css.pluginId}>{card.id}</span>

@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-10-overlay-plugin-rail-fibers.md
-2026-09-10-overlay-plugin-rail-fibers.md: 2dc6d765ff024c8d0f6556ac95ffe2ac594349a4
-2026-09-10-overlay-plugin-rail-fibers.zh.md: 947d642527caa246c9019eac5a0613257f731143
+2026-09-10-overlay-plugin-rail-fibers.md: 3946b82fe31beae8e47ead87aff3cc0648ac3e7f
+2026-09-10-overlay-plugin-rail-fibers.zh.md: 628b166b05604a6b5ea11e962416c64a4873b3ce

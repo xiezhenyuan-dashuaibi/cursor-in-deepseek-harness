@@ -5,8 +5,9 @@ import {
   isOverlayCardUnknownEndpoint,
   OVERLAY_CARD_LIST_ENDPOINT, OVERLAY_CARD_PLUG_RPC_CHANNEL, OVERLAY_CARD_RPC_CHANNEL,
   OVERLAY_CARD_SET_HIDDEN_ENDPOINT, OVERLAY_CARD_SET_INSERTED_ENDPOINT, OVERLAY_PLUGIN_LIST_ENDPOINT,
-  OVERLAY_PLUGIN_RAIL_RPC_CHANNEL, OVERLAY_PLUGIN_RPC_CHANNEL, OVERLAY_PLUGIN_SET_INSERTED_ENDPOINT,
-  OVERLAY_PLUGIN_SWITCH_DESKTOP_ENDPOINT, overlayCardsFromListValue,
+  OVERLAY_PLUGIN_RAIL_RPC_CHANNEL, OVERLAY_PLUGIN_RPC_CHANNEL, OVERLAY_PLUGIN_SET_HIDDEN_ENDPOINT,
+  OVERLAY_PLUGIN_SET_INSERTED_ENDPOINT,
+  OVERLAY_PLUGIN_SWITCH_DESKTOP_ENDPOINT, overlayCardsFromListValue, overlayPluginsFromListValue,
 } from '../src/client/overlay-card-rpc.ts'
 
 describe('overlayCardsFromListValue', () => {
@@ -254,6 +255,16 @@ describe('callOverlayPluginSetHidden', () => {
       { id: '1', hidden: true },
     )
   })
+
+  it('writes plugins.setHidden for a shaped occupant', async () => {
+    const call = vi.fn(async () => ({ ok: true as const }))
+    await callOverlayPluginSetHidden({ call }, 'ui-sprite', true, 'shaped')
+    expect(call).toHaveBeenCalledWith(
+      OVERLAY_PLUGIN_RAIL_RPC_CHANNEL,
+      OVERLAY_PLUGIN_SET_HIDDEN_ENDPOINT,
+      { id: 'ui-sprite', hidden: true },
+    )
+  })
 })
 
 describe('callOverlayPluginSetInserted', () => {
@@ -272,6 +283,13 @@ describe('callOverlayPluginSetInserted', () => {
       OVERLAY_PLUGIN_SET_INSERTED_ENDPOINT,
       { id: 'ui-fish-tank', inserted: false },
     )
+    call.mockClear()
+    await callOverlayPluginSetInserted({ call }, 'ui-sprite', false, 'shaped')
+    expect(call).toHaveBeenCalledWith(
+      OVERLAY_PLUGIN_RAIL_RPC_CHANNEL,
+      OVERLAY_PLUGIN_SET_INSERTED_ENDPOINT,
+      { id: 'ui-sprite', inserted: false },
+    )
   })
 })
 
@@ -284,5 +302,27 @@ describe('callOverlayPluginSwitchDesktop', () => {
       OVERLAY_PLUGIN_SWITCH_DESKTOP_ENDPOINT,
       { id: 'ui-other-desk' },
     )
+  })
+})
+
+describe('overlayPluginsFromListValue', () => {
+  it('keeps kind shaped on a plugins.list occupant', () => {
+    expect(overlayPluginsFromListValue({
+      plugins: [{
+        id: 'ui-sprite',
+        title: '精灵',
+        hidden: true,
+        inserted: true,
+        occupants: ['ui-sprite'],
+        kind: 'shaped',
+      }],
+    })).toEqual([{
+      id: 'ui-sprite',
+      title: '精灵',
+      hidden: true,
+      inserted: true,
+      occupants: ['ui-sprite'],
+      kind: 'shaped',
+    }])
   })
 })

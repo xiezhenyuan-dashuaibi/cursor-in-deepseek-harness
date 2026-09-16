@@ -14,10 +14,10 @@ Overlay frontend has three presentation forms. This skill covers only a floating
 | Form | Skill | HOW |
 |---|---|---|
 | Card window | `dsh-overlay-web-plugins` | This file |
-| Arbitrary-shape floater (sprite, TV widget, any non-card outline) | [`dsh-overlay-shaped-plugins`](../dsh-overlay-shaped-plugins/SKILL.md) | Reserved slot |
+| Arbitrary-shape floater (sprite, TV widget, any non-card outline) | [`dsh-overlay-shaped-plugins`](../dsh-overlay-shaped-plugins/SKILL.md) | Authored |
 | Desktop (桌面; full-viewport under cards) | [`dsh-overlay-canvas-plugins`](../dsh-overlay-canvas-plugins/SKILL.md) | Authored |
 
-Do not occupy `overlay-card.body` for a sprite, a TV-shaped widget, a desktop, or any other non-card outline. Do not treat this skill as the desktop path. If the task is the desktop form, load `dsh-overlay-canvas-plugins`. If the task is a reserved form, load that skill; do not invent its procedure from this file.
+Do not occupy `overlay-card.body` for a sprite, a TV-shaped widget, a desktop, or any other non-card outline. Do not treat this skill as the desktop path. If the task is the desktop form, load `dsh-overlay-canvas-plugins`. If the task is the shaped form, load `dsh-overlay-shaped-plugins`; do not invent its procedure from this file.
 
 ## Never restart `dsh web`
 
@@ -31,7 +31,7 @@ After adding a checkout package, run repo-root `pnpm install` or `pnpm install -
 
 ## Frontend stays independent
 
-Invent this page from the product brief and the generator stub in this new package. Do not follow another overlay occupant's style. Do not search, grep, or open another overlay occupant's `Page.tsx`, `Page.module.css`, locales, or page tests as reference. Do not copy the currently painted desktop or card. Open another occupant's page frontend only when the user explicitly asked to make something similar to that product ([visual independence](../../notes/implemented/process/2026-09-12-overlay-occupant-visual-independence.md)). Host packages `ui-float-window` and `ui-overlay-desktop`, `--dsw-alias-*`, and [web styling](../../../docs/web-styling.md) are shared chrome, not a product-page template.
+Invent this page from the product brief and the generator stub in this new package. Do not follow another overlay occupant's style. Do not search, grep, or open another overlay occupant's `Page.tsx`, `Page.module.css`, locales, or page tests as reference. Do not copy the currently painted desktop or card. Open another occupant's page frontend only when the user explicitly asked to make something similar to that product ([visual independence](../../notes/implemented/process/2026-09-12-overlay-occupant-visual-independence.md)). Host packages `ui-float-window`, `ui-overlay-desktop`, and `ui-overlay-shaped`, `--dsw-alias-*`, and [web styling](../../../docs/web-styling.md) are shared chrome, not a product-page template.
 
 ## Canonical card
 
@@ -66,7 +66,7 @@ Follow these so a new page is manageable from that panel without changing produc
 1. Keep `dsh.client.overlayBody` equal to the body slot you `slots.inject` (`overlay-card.body` or `overlay-card-N.body`). `overlay:new-page` writes seat 1. Occupying a later seat means changing that field to match, then `overlay:live insert` or `update` so `occupants` records this Loader id. Without that declaration, 拔出 is dimmed and the fiber stays up.
 2. Dual-face (host `provide` / RPC + page) is **one** package and **one** Loader row. Unplug that id stops SQLite/`provide` and the body together. Do not insert a host-only extra package for the same window — the rail cannot attach it to that card. A different window is another card insert plus another page package with its own `overlayBody`.
 3. Register host RPC and `provide` in `apply` through `ctx.effect` (or `inject`) so Loader `disabled` tears them down. Dependents `inject` those services; do not keep a provider alive with a loose `ctx.get` after it unplugs.
-4. Do not reuse Loader ids `ui-float-window`, `ui-overlay-desktop`, `ui-cursor-agent` / `cursor-agent`, `overlay-card-*-rpc`, `overlay-plugin-roster-rpc`, or `overlay-plugin-rail-rpc`. Do not disable those rows. Do not occupy `root` or `shell.overlay` with product chrome.
+4. Do not reuse Loader ids `ui-float-window`, `ui-overlay-desktop`, `ui-overlay-shaped`, `ui-cursor-agent` / `cursor-agent`, `overlay-card-*-rpc`, `overlay-plugin-roster-rpc`, or `overlay-plugin-rail-rpc`. Do not disable those rows. Do not occupy `root` or `shell.overlay` with product chrome.
 5. Do not invent a product plug flag, call `overlay:live remove` to pause, or edit `packages/bundle/web-app/cordis.patch.yml` while this process is up. Pause is the panel (or patch `disabled`); uninstall is `overlay:live remove`.
 
 ## Insert-time settings

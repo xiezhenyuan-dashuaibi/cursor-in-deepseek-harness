@@ -36,7 +36,7 @@ Cursor 轨最顶一行永远是**桌面**：已插入的占用者（`panelTitle`
 
 ## Consequences
 
-先插入基模再插入桌面页，画面垫在卡片和 Cursor 之下，不抢走命中。再插入另一个桌面页会暂停前一个占用者 fiber。插件栏桌面行卸下该 fiber；切换桌面会互斥启用所选占用者。checkout 保留。任意形状 HOW 仍预留。
+先插入基模再插入桌面页，画面垫在卡片和 Cursor 之下，不抢走命中。再插入另一个桌面页会暂停前一个占用者 fiber。插件栏桌面行卸下该 fiber；切换桌面会互斥启用所选占用者。checkout 保留。任意形状占用者插入是 [overlay 异形占用者生成](../process/2026-09-14-overlay-new-shaped.md)；异形画板是 [异形宿主](2026-09-14-overlay-shaped-host.md)。
 
 ## Testing
 

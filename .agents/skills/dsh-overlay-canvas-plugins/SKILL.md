@@ -16,10 +16,10 @@ Overlay frontend has three presentation forms. This skill covers only the full-v
 | Form | Skill | HOW |
 |---|---|---|
 | Card window | [`dsh-overlay-web-plugins`](../dsh-overlay-web-plugins/SKILL.md) | Authored |
-| Arbitrary-shape floater (sprite, TV widget, any non-card outline) | [`dsh-overlay-shaped-plugins`](../dsh-overlay-shaped-plugins/SKILL.md) | Reserved slot |
+| Arbitrary-shape floater (sprite, TV widget, any non-card outline) | [`dsh-overlay-shaped-plugins`](../dsh-overlay-shaped-plugins/SKILL.md) | Authored |
 | Desktop (桌面; full-viewport under cards, not a floating card) | `dsh-overlay-canvas-plugins` | This file |
 
-Do not occupy `root` (AppFrame). Do not occupy `overlay-card.body` or copy [`ui-float-window`](../../../packages/client/ui-float-window/README.md). Do not invent shaped HOW from this file. If the task is a reserved form, load that skill and stop.
+Do not occupy `root` (AppFrame). Do not occupy `overlay-card.body` or copy [`ui-float-window`](../../../packages/client/ui-float-window/README.md). Do not invent shaped HOW from this file. If the task is the shaped form, load `dsh-overlay-shaped-plugins`.
 
 ## Never restart `dsh web`
 
@@ -33,7 +33,7 @@ After adding a checkout package, run repo-root `pnpm install` or `pnpm install -
 
 ## Frontend stays independent
 
-Invent this page from the product brief and the generator stub in this new package. Do not follow another overlay occupant's style. Do not search, grep, or open another overlay occupant's `Page.tsx`, `Page.module.css`, locales, or page tests as reference. Do not copy the currently painted desktop or card. Open another occupant's page frontend only when the user explicitly asked to make something similar to that product ([visual independence](../../notes/implemented/process/2026-09-12-overlay-occupant-visual-independence.md)). Host packages `ui-overlay-desktop` and `ui-float-window`, `--dsw-alias-*`, and [web styling](../../../docs/web-styling.md) are shared chrome, not a product-page template.
+Invent this page from the product brief and the generator stub in this new package. Do not follow another overlay occupant's style. Do not search, grep, or open another overlay occupant's `Page.tsx`, `Page.module.css`, locales, or page tests as reference. Do not copy the currently painted desktop or card. Open another occupant's page frontend only when the user explicitly asked to make something similar to that product ([visual independence](../../notes/implemented/process/2026-09-12-overlay-occupant-visual-independence.md)). Host packages `ui-overlay-desktop`, `ui-overlay-shaped`, and `ui-float-window`, `--dsw-alias-*`, and [web styling](../../../docs/web-styling.md) are shared chrome, not a product-page template.
 
 ## Canonical desktop board
 
@@ -65,7 +65,7 @@ Follow these so a new desktop page is manageable from that panel:
 1. Keep `dsh.client.overlayBody` equal to `overlay-desktop.body`. `overlay:new-desktop` writes it. Without that declaration, live insert cannot exclusive-disable other desktop occupants and the rail cannot classify the row as 桌面.
 2. Dual-face (host `provide` / RPC + page) is **one** package and **one** Loader row. Unplug that id stops SQLite/`provide` and the body together.
 3. Register host RPC and `provide` in `apply` through `ctx.effect` (or `inject`) so Loader `disabled` tears them down.
-4. Do not reuse Loader ids `ui-overlay-desktop`, `ui-float-window`, `ui-cursor-agent` / `cursor-agent`, `overlay-card-*-rpc`, `overlay-plugin-roster-rpc`, or `overlay-plugin-rail-rpc`. Do not disable those rows. Do not occupy `root` or `overlay-card.body`.
+4. Do not reuse Loader ids `ui-overlay-desktop`, `ui-overlay-shaped`, `ui-float-window`, `ui-cursor-agent` / `cursor-agent`, `overlay-card-*-rpc`, `overlay-plugin-roster-rpc`, or `overlay-plugin-rail-rpc`. Do not disable those rows. Do not occupy `root` or `overlay-card.body`.
 5. Do not invent a product plug flag, call `overlay:live remove` to pause, or edit `packages/bundle/web-app/cordis.patch.yml` while this process is up. Pause is the panel (or patch `disabled`); uninstall is `overlay:live remove`. Switching desktops is exclusive enable, not `overlay:live remove`. Do not `overlay:live remove` an occupant without `--keep-files` unless the checkout package should be deleted.
 
 ## Fast path for a new desktop page

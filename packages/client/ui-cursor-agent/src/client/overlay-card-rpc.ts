@@ -23,7 +23,7 @@ export const OVERLAY_CARD_SET_HIDDEN_ENDPOINT = 'instances.setHidden'
 export const OVERLAY_CARD_SET_INSERTED_ENDPOINT = 'occupants.setInserted'
 
 /** How the rail hides or unplugs this row. */
-export type OverlayPluginKind = 'card' | 'fiber' | 'desktop'
+export type OverlayPluginKind = 'card' | 'fiber' | 'desktop' | 'shaped'
 
 /** One overlay card as the plugin manager lists it. */
 export type OverlayCardManagerItem = {
@@ -31,13 +31,16 @@ export type OverlayCardManagerItem = {
   readonly id: string
   /** Title-bar left name or `dsh.client.panelTitle`. */
   readonly title: string
-  /** `true` when the desk skipped this window, or the fiber is disabled. */
+  /** `true` when the desk skipped this window, or a shaped occupant is in host `hidden.json`. */
   readonly hidden: boolean
   /** `false` when an occupant fiber is disabled or missing. */
   readonly inserted: boolean
   /** Loader ids on this seat; empty dims 插入/拔出. */
   readonly occupants: readonly string[]
-  /** `fiber` is a standalone overlay Loader row; `desktop` is an overlay-desktop.body occupant; omitted means `card`. */
+  /**
+   * `fiber` is a standalone overlay Loader row; `shaped` occupies overlay-shaped.body;
+   * `desktop` occupies overlay-desktop.body; omitted means `card`.
+   */
   readonly kind?: OverlayPluginKind
 }
 
@@ -216,6 +219,9 @@ export const OVERLAY_PLUGIN_LIST_ENDPOINT = 'plugins.list'
 /** Endpoint that sets Loader `disabled` on one standalone plugin id. */
 export const OVERLAY_PLUGIN_SET_INSERTED_ENDPOINT = 'plugins.setInserted'
 
+/** Endpoint that writes shaped-host `hidden.json` for one occupant Loader id. */
+export const OVERLAY_PLUGIN_SET_HIDDEN_ENDPOINT = 'plugins.setHidden'
+
 /** Endpoint that exclusive-enables one overlay-desktop.body occupant. */
 export const OVERLAY_PLUGIN_SWITCH_DESKTOP_ENDPOINT = 'plugins.switchDesktop'
 
@@ -232,10 +238,11 @@ export async function callOverlayPluginList(rpc: OverlayCardRpc): Promise<Overla
 
 /**
  * Hide or show one rail row. Fiber and desktop rows have no hide file.
+ * Shaped occupants write the host `hidden.json` and stay mounted.
  * @param rpc - Connection generic RPC caller.
  * @param id - card id or standalone Loader id.
- * @param hidden - `true` skips the window.
- * @param kind - `fiber` / `desktop` reject hide.
+ * @param hidden - `true` skips the window or hides the silhouette.
+ * @param kind - `fiber` / `desktop` reject hide; `shaped` writes `plugins.setHidden`.
  */
 export async function callOverlayPluginSetHidden(
   rpc: OverlayCardRpc,
@@ -246,6 +253,10 @@ export async function callOverlayPluginSetHidden(
   if (kind === 'fiber' || kind === 'desktop') {
     throw new Error('overlay-plugins: hide is not supported for this plugin')
   }
+  if (kind === 'shaped') {
+    await callOverlayPluginWrite(rpc, OVERLAY_PLUGIN_SET_HIDDEN_ENDPOINT, { id, hidden })
+    return
+  }
   await callOverlayCardSetHidden(rpc, id, hidden)
 }
 
@@ -254,7 +265,7 @@ export async function callOverlayPluginSetHidden(
  * @param rpc - Connection generic RPC caller.
  * @param id - card id or standalone Loader id.
  * @param inserted - `false` sets Loader `disabled: true`.
- * @param kind - `fiber` / `desktop` route to `/overlay-plugins-rail`.
+ * @param kind - `fiber` / `desktop` / `shaped` route to `/overlay-plugins-rail`.
  */
 export async function callOverlayPluginSetInserted(
   rpc: OverlayCardRpc,
@@ -262,7 +273,7 @@ export async function callOverlayPluginSetInserted(
   inserted: boolean,
   kind: OverlayPluginKind = 'card',
 ): Promise<void> {
-  if (kind === 'fiber' || kind === 'desktop') {
+  if (kind === 'fiber' || kind === 'desktop' || kind === 'shaped') {
     await callStandaloneSetInserted(rpc, id, inserted)
     return
   }
@@ -374,7 +385,9 @@ function pluginItemFromUnknown(
       return undefined
     }
   }
-  const kind = record.kind === 'desktop' || record.kind === 'fiber' ? record.kind : fallbackKind
+  const kind = record.kind === 'desktop' || record.kind === 'fiber' || record.kind === 'shaped'
+    ? record.kind
+    : fallbackKind
   return {
     id: record.id,
     title: record.title,

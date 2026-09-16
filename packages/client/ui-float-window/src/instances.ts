@@ -56,6 +56,7 @@ const CARD_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/
 const PROTECTED_LOADER_IDS: ReadonlySet<string> = new Set([
   'ui-float-window',
   'ui-overlay-desktop',
+  'ui-overlay-shaped',
   'ui-cursor-agent',
   'cursor-agent',
   'overlay-card-roster-rpc',

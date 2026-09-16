@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import {
   coalesceAssistantText,
+  collapseReplayedAssistantText,
   countActiveTasks,
   emptyChatFold,
   foldCursorEvent,
@@ -61,6 +62,129 @@ describe('messageText / toolCallName / isAssistantDelta', () => {
       'already has replayed chunk here',
     )
     expect(coalesceAssistantText('Hello', ' world')).toBe('Hello world')
+    const spacedUnit = `${'W'.repeat(16)} ${'W'.repeat(16)}.`
+    const compactDouble = `${'W'.repeat(32)}.${'W'.repeat(32)}.`
+    expect(coalesceAssistantText(spacedUnit, compactDouble)).toBe(spacedUnit)
+    expect(coalesceAssistantText('chunk here', 'prefix chunk here suffix extra')).toBe(
+      'prefix chunk here suffix extra',
+    )
+    expect(coalesceAssistantText('Hello', '   \n')).toBe('Hello')
+    expect(coalesceAssistantText('   \n', 'Hello')).toBe('Hello')
+    expect(coalesceAssistantText('Hello World extra text!!', 'HelloWorld extra text!! more')).toBe(
+      'HelloWorld extra text!! more',
+    )
+    expect(coalesceAssistantText('HelloWorld extra text!! more', 'Hello World extra text!!')).toBe(
+      'HelloWorld extra text!! more',
+    )
+    expect(coalesceAssistantText(
+      'already has replayed chunk here extra',
+      'replayed  chunk',
+    )).toBe('already has replayed chunk here extra')
+    expect(coalesceAssistantText(
+      'replayed  chunk',
+      'already has replayed chunk here extra',
+    )).toBe('already has replayed chunk here extra')
+    const tableLoose = [
+      '先把边界钉死。',
+      '',
+      '| 对比 | overlay | HOW |',
+      '| --- | --- | --- |',
+      '| 职责 | 聊天 | 产品能力 |',
+      '',
+      'HOW 不是一层，不能当成卡片。',
+    ].join('\n')
+    const tableTight = [
+      '先把边界钉死。',
+      '',
+      '|对比|overlay|HOW|',
+      '|---|---|---|',
+      '|职责|聊天|产品能力|',
+      '',
+      'HOW 不是一层，不能当成卡片。',
+    ].join('\n')
+    expect(coalesceAssistantText(tableLoose, tableTight)).toBe(tableTight)
+    expect(coalesceAssistantText(tableLoose + tableLoose, tableLoose)).toBe(tableLoose)
+    const jammedTable = `${'能'.repeat(8)}。SVG适合画轮廓，网页仍然用HTML的iframe来开。##外形|办法|做什么|`
+    const prettyTable = `${'能'.repeat(8)}。SVG适合画轮廓，网页仍然用 HTML 的 iframe 来开。\n\n## 外形\n\n| 办法 | 做什么 |`
+    expect(coalesceAssistantText(jammedTable, prettyTable)).toBe(prettyTable)
+    expect(messageText({
+      content: [{ type: 'text', text: tableLoose }, { type: 'text', text: tableLoose }],
+    })).toBe(tableLoose)
+  })
+})
+
+describe('collapseReplayedAssistantText', () => {
+  const para1 = `${'甲'.repeat(32)}。`
+  const para2 = `${'乙'.repeat(32)}。`
+  const para3 = `${'丙'.repeat(32)}。`
+  const jammedProse = '能。SVG适合画轮廓，网页仍然用HTML的iframe来开。两者叠在一起，不必把整个站点画进SVG。'
+  const prettyProse = '能。SVG适合画轮廓，网页仍然用 HTML 的 iframe 来开。两者叠在一起，不必把整个站点画进 SVG。'
+  const jammedTable = '##外形还能怎么做|办法|做什么|命中|---|---|---|现在这样：多块HTML|拼出像电视的柜子|仍是外接矩形|'
+  const prettyTable = [
+    '## 外形还能怎么做',
+    '',
+    '| 办法 | 做什么 | 命中 |',
+    '| --- | --- | --- |',
+    '| 现在这样：多块HTML | 拼出像电视的柜子 | 仍是外接矩形 |',
+  ].join('\n')
+  const jammedCopy = `${jammedProse}${jammedTable}`
+  const prettyCopy = `${prettyProse}\n\n${prettyTable}`
+
+  it('drops an earlier sentence that appears again later', () => {
+    expect(collapseReplayedAssistantText(`${para1}${para2}${para2}${para3}`)).toBe(
+      `${para1}${para2}${para3}`,
+    )
+    expect(collapseReplayedAssistantText(`${para1}${para1} extra`)).toBe(`${para1} extra`)
+    expect(collapseReplayedAssistantText(para1)).toBe(para1)
+    expect(collapseReplayedAssistantText(`${'x'.repeat(40)}${'x'.repeat(40)}`)).toBe('x'.repeat(40))
+    expect(collapseReplayedAssistantText(`${'y'.repeat(80)} unique tail`)).toBe(
+      `${'y'.repeat(80)} unique tail`,
+    )
+    expect(collapseReplayedAssistantText(`${para1}\n\n${para1}\n\n${para3}`)).toBe(
+      `${para1}\n\n${para3}`,
+    )
+    expect(collapseReplayedAssistantText('Short. Short. Extra.')).toBe('Short. Short. Extra.')
+    const en1 = `${'A'.repeat(32)}. `
+    expect(collapseReplayedAssistantText(`${en1}${en1}Tail.`)).toBe(`${en1}Tail.`)
+    const jammedLead = [
+      '不是卡死，也 overlay:live 自己挂了。',
+      '上次那一轮慢，是因为没有只跑这一条。',
+      '宿主其实早就插进现场 profile 了；再 insert 只会报 already inserted，插件栏当时还故意列出它。',
+      'overlay:live insert 本身也比「写一行 yaml」重一点，但那是设计，这次的故障是先编这个包的 lib/。',
+    ].join('')
+    const prettyLead = [
+      '上次那一轮慢，是因为没有只跑这一条。',
+      '宿主其实早就插进现场 profile 了；再 insert 只会报 already inserted，插件栏当时还故意列出它。',
+      '',
+      'overlay:live insert 本身也比「写一行 yaml」重一点，但那是设计，不是这次的故障：',
+      '',
+      '- 先编这个包的 lib/',
+    ].join('\n')
+    expect(collapseReplayedAssistantText(`${jammedLead}${prettyLead}`)).toBe(prettyLead)
+    expect(coalesceAssistantText(jammedLead, prettyLead)).toBe(prettyLead)
+    const spacedFirst = '上次那一轮慢，是因为没有只跑 这一条。'
+    const spacedSecond = '宿主其实早就插进现场 profile 了；再 insert 只会报 already inserted，插件栏当时还故意列出它。'
+    const spacedPretty = `${spacedFirst}\n${spacedSecond}`
+    expect(collapseReplayedAssistantText(`${jammedLead}${spacedPretty}`)).toBe(spacedPretty)
+    const uniqueLead = `${'挂'.repeat(32)}。`
+    const sixteen = `${'戊'.repeat(16)}。`
+    expect(collapseReplayedAssistantText(`${uniqueLead}${sixteen}${sixteen}`)).toBe(
+      `${uniqueLead}${sixteen}${sixteen}`,
+    )
+  })
+
+  it('drops a jammed markdown copy in front of the pretty restart', () => {
+    expect(collapseReplayedAssistantText(`${jammedCopy}${prettyCopy}`)).toBe(prettyCopy)
+    expect(collapseReplayedAssistantText(
+      `${jammedProse}${jammedTable}${prettyProse}\n\n${prettyTable}`,
+    )).toBe(prettyCopy)
+    const padded = `${'乙'.repeat(16)} ${'乙'.repeat(16)}。`
+    expect(collapseReplayedAssistantText(`${para1}${padded}${para2}${para3}`)).toBe(
+      `${para1}${para2}${para3}`,
+    )
+    expect(collapseReplayedAssistantText(`${'z'.repeat(40)}   ${'z'.repeat(40)}`)).toBe(
+      `  ${'z'.repeat(40)}`,
+    )
   })
 })
 
@@ -293,7 +417,7 @@ describe('foldCursorEvent', () => {
     expect(state.turns).toEqual([{ id: 'turn-2', role: 'assistant', text: 'only' }])
   })
 
-  it('extends the same assistant band after thinking and task_notification', () => {
+  it('keeps thinking above the answer instead of writing back into an earlier assistant', () => {
     let state = fold(emptyChatFold(), {
       type: 'assistant',
       timestamp_ms: 1,
@@ -311,6 +435,12 @@ describe('foldCursorEvent', () => {
       message: { content: [{ type: 'text', text: '两件都已经挂到当前 overlay 上了。' }] },
     })
     expect(state.turns.filter(t => t.role === 'assistant')).toHaveLength(1)
+    expect(state.turns.map(turn => turn.role)).toEqual([
+      'activity',
+      'activity',
+      'thinking',
+      'assistant',
+    ])
     expect(state.turns.find(t => t.role === 'assistant')).toMatchObject({
       text: '两件都已经挂到当前 overlay 上了。',
       streaming: true,
@@ -321,6 +451,12 @@ describe('foldCursorEvent', () => {
       message: { content: [{ type: 'text', text: '卡片插入已经跑完。' }] },
     })
     expect(state.turns.filter(t => t.role === 'assistant')).toHaveLength(1)
+    expect(state.turns.map(turn => turn.role)).toEqual([
+      'activity',
+      'activity',
+      'thinking',
+      'assistant',
+    ])
     expect(state.turns.find(t => t.role === 'assistant')).toMatchObject({
       text: '两件都已经挂到当前 overlay 上了。卡片插入已经跑完。',
       streaming: true,
@@ -345,6 +481,7 @@ describe('foldCursorEvent', () => {
   it('opens a second assistant band only for a distinct complete message', () => {
     let state = fold(emptyChatFold(), {
       type: 'assistant',
+      timestamp_ms: 1,
       message: { content: [{ type: 'text', text: 'first' }] },
     })
     state = fold(state, {
@@ -355,6 +492,76 @@ describe('foldCursorEvent', () => {
       'first',
       'unrelated later',
     ])
+    expect((state.turns[0] as { streaming?: boolean }).streaming).toBeUndefined()
+    state = fold(emptyChatFold(), {
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: 'first' }] },
+    })
+    state = fold(state, {
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: 'unrelated later' }] },
+    })
+    expect(state.turns.map(turn => turn.role === 'assistant' ? turn.text : turn.role)).toEqual([
+      'first',
+      'unrelated later',
+    ])
+  })
+
+  it('keeps one assistant band when a complete snapshot only changes table padding', () => {
+    const loose = [
+      '先把边界钉死。',
+      '',
+      '| 对比 | overlay | HOW |',
+      '| --- | --- | --- |',
+      '| 职责 | 聊天 | 产品能力 |',
+    ].join('\n')
+    const tight = [
+      '先把边界钉死。',
+      '',
+      '|对比|overlay|HOW|',
+      '|---|---|---|',
+      '|职责|聊天|产品能力|',
+    ].join('\n')
+    let state = fold(emptyChatFold(), {
+      type: 'assistant',
+      timestamp_ms: 1,
+      message: { content: [{ type: 'text', text: loose }] },
+    })
+    state = fold(state, {
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: tight }] },
+    })
+    expect(state.turns.filter(turn => turn.role === 'assistant')).toHaveLength(1)
+    expect(state.turns.find(turn => turn.role === 'assistant')).toMatchObject({ text: tight })
+  })
+
+  it('does not concatenate a whitespace-only table snapshot onto live deltas', () => {
+    const loose = [
+      '先把边界钉死。',
+      '',
+      '| 对比 | overlay | HOW |',
+      '| --- | --- | --- |',
+      '| 职责 | 聊天 | 产品能力 |',
+    ].join('\n')
+    const tight = [
+      '先把边界钉死。',
+      '',
+      '|对比|overlay|HOW|',
+      '|---|---|---|',
+      '|职责|聊天|产品能力|',
+    ].join('\n')
+    let state = fold(emptyChatFold(), {
+      type: 'assistant',
+      timestamp_ms: 1,
+      message: { content: [{ type: 'text', text: loose }] },
+    })
+    state = fold(state, {
+      type: 'assistant',
+      timestamp_ms: 2,
+      message: { content: [{ type: 'text', text: tight }] },
+    })
+    expect(state.turns.filter(turn => turn.role === 'assistant')).toHaveLength(1)
+    expect(state.turns[0]).toMatchObject({ role: 'assistant', text: tight, streaming: true })
   })
 
   it('ignores a duplicate complete snapshot of the same assistant text', () => {
@@ -467,6 +674,233 @@ describe('foldCursorEvent', () => {
       message: { content: [{ type: 'text', text: 'Hel' }] },
     })
     expect(state.turns).toMatchObject([{ role: 'assistant', text: 'Hello', streaming: true }])
+    state = fold(state, { type: 'thinking', subtype: 'delta', text: 'check' })
+    state = fold(state, {
+      type: 'assistant',
+      timestamp_ms: 3,
+      message: { content: [{ type: 'text', text: 'Hello world' }] },
+    })
+    expect(state.turns.filter(turn => turn.role === 'assistant')).toHaveLength(1)
+    expect(state.turns.map(turn => turn.role)).toEqual(['thinking', 'assistant'])
+    expect(state.turns.find(turn => turn.role === 'assistant')).toMatchObject({
+      text: 'Hello world',
+      streaming: true,
+    })
+  })
+
+  it('collapses a replayed complete snapshot onto one final assistant copy', () => {
+    const para1 = `${'甲'.repeat(32)}。`
+    const para2 = `${'乙'.repeat(32)}。`
+    const para3 = `${'丙'.repeat(32)}。`
+    let state = fold(emptyChatFold(), {
+      type: 'assistant',
+      timestamp_ms: 1,
+      message: { content: [{ type: 'text', text: `${para1}${para2}` }] },
+    })
+    state = fold(state, {
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: `${para2}${para3}` }] },
+    })
+    expect(state.turns.filter(turn => turn.role === 'assistant')).toHaveLength(1)
+    expect(state.turns.find(turn => turn.role === 'assistant')).toMatchObject({
+      text: `${para1}${para2}${para3}`,
+    })
+    expect((state.turns.find(turn => turn.role === 'assistant') as { streaming?: boolean }).streaming)
+      .toBeUndefined()
+  })
+
+  it('settles thinking and running tools when the final assistant payload arrives', () => {
+    let state = fold(emptyChatFold(), { type: 'thinking', subtype: 'delta', text: 'plan' })
+    state = fold(state, {
+      type: 'tool_call',
+      subtype: 'started',
+      call_id: 'hang',
+      tool_call: { readToolCall: { args: { path: 'a' } } },
+    })
+    expect(state.turns).toMatchObject([
+      { role: 'thinking', streaming: true },
+      { role: 'tool', status: 'running' },
+    ])
+    state = fold(state, {
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: `${'甲'.repeat(32)}。` }] },
+    })
+    expect(state.turns.find(turn => turn.role === 'thinking')).toMatchObject({
+      role: 'thinking',
+      text: 'plan',
+    })
+    expect((state.turns.find(turn => turn.role === 'thinking') as { streaming?: boolean }).streaming)
+      .toBeUndefined()
+    expect(state.turns.find(turn => turn.role === 'tool')).toMatchObject({ status: 'running' })
+    state = fold(state, { type: 'result', subtype: 'success' })
+    expect(state.turns.find(turn => turn.role === 'tool')).toMatchObject({ status: 'done' })
+  })
+
+  it('collapses concatenated replay when the turn settles', () => {
+    const para1 = `${'甲'.repeat(32)}。`
+    const para2 = `${'乙'.repeat(32)}。`
+    const para3 = `${'丙'.repeat(32)}。`
+    let state = fold(emptyChatFold(), {
+      type: 'assistant',
+      timestamp_ms: 1,
+      message: { content: [{ type: 'text', text: `${para1}${para2}` }] },
+    })
+    state = fold(state, {
+      type: 'assistant',
+      timestamp_ms: 2,
+      message: { content: [{ type: 'text', text: `${para2}${para3}` }] },
+    })
+    expect(state.turns.find(turn => turn.role === 'assistant')).toMatchObject({
+      text: `${para1}${para2}${para2}${para3}`,
+      streaming: true,
+    })
+    state = settleStreaming(state)
+    expect(state.turns.filter(turn => turn.role === 'assistant')).toHaveLength(1)
+    expect(state.turns.find(turn => turn.role === 'assistant')).toMatchObject({
+      text: `${para1}${para2}${para3}`,
+    })
+    expect((state.turns.find(turn => turn.role === 'assistant') as { streaming?: boolean }).streaming)
+      .toBeUndefined()
+  })
+
+  it('drops a jammed first copy when the pretty snapshot arrives', () => {
+    const jammedProse = '能。SVG适合画轮廓，网页仍然用HTML的iframe来开。两者叠在一起，不必把整个站点画进SVG。'
+    const prettyProse = '能。SVG适合画轮廓，网页仍然用 HTML 的 iframe 来开。两者叠在一起，不必把整个站点画进 SVG。'
+    const jammedTable = '##外形还能怎么做|办法|做什么|命中|---|---|---|现在这样：多块HTML|拼出像电视的柜子|仍是外接矩形|'
+    const prettyTable = [
+      '## 外形还能怎么做',
+      '',
+      '| 办法 | 做什么 | 命中 |',
+      '| --- | --- | --- |',
+      '| 现在这样：多块HTML | 拼出像电视的柜子 | 仍是外接矩形 |',
+    ].join('\n')
+    const jammedCopy = `${jammedProse}${jammedTable}`
+    const prettyCopy = `${prettyProse}\n\n${prettyTable}`
+    let state = fold(emptyChatFold(), {
+      type: 'assistant',
+      timestamp_ms: 1,
+      message: { content: [{ type: 'text', text: jammedCopy }] },
+    })
+    state = fold(state, {
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: prettyCopy }] },
+    })
+    expect(state.turns.filter(turn => turn.role === 'assistant')).toHaveLength(1)
+    expect(state.turns.find(turn => turn.role === 'assistant')).toMatchObject({ text: prettyCopy })
+    let interrupted = fold(emptyChatFold(), {
+      type: 'assistant',
+      timestamp_ms: 1,
+      message: { content: [{ type: 'text', text: jammedCopy }] },
+    })
+    interrupted = fold(interrupted, { type: 'thinking', subtype: 'delta', text: 'plan' })
+    interrupted = fold(interrupted, {
+      type: 'tool_call',
+      subtype: 'started',
+      call_id: 'read-1',
+      tool_call: { readToolCall: { args: { path: 'a' } } },
+    })
+    interrupted = fold(interrupted, {
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: prettyCopy }] },
+    })
+    expect(interrupted.turns.filter(turn => turn.role === 'assistant')).toHaveLength(1)
+    expect(interrupted.turns.map(turn => turn.role)).toEqual([
+      'thinking',
+      'tool',
+      'assistant',
+    ])
+    expect(interrupted.turns.find(turn => turn.role === 'assistant')).toMatchObject({
+      text: prettyCopy,
+    })
+    const twoBands = settleStreaming({
+      turns: [
+        { id: 'u', role: 'user', text: 'shape' },
+        { id: 'a1', role: 'assistant', text: jammedCopy },
+        { id: 'think', role: 'thinking', text: 'plan' },
+        { id: 'a2', role: 'assistant', text: prettyCopy },
+      ],
+    })
+    expect(twoBands.turns.filter(turn => turn.role === 'assistant')).toHaveLength(1)
+    expect(twoBands.turns).toMatchObject([
+      { role: 'user', text: 'shape' },
+      { role: 'thinking', text: 'plan' },
+      { role: 'assistant', text: prettyCopy },
+    ])
+    const distinct = settleStreaming({
+      turns: [
+        { id: 'a1', role: 'assistant', text: `${'甲'.repeat(32)}。unique-one` },
+        { id: 'a2', role: 'assistant', text: `${'丁'.repeat(32)}。unique-two` },
+      ],
+    })
+    expect(distinct.turns.filter(turn => turn.role === 'assistant')).toHaveLength(2)
+    const rewrittenLead = [
+      '不是卡死，也 overlay:live 自己挂了。',
+      '上次那一轮慢，是因为没有只跑这一条。',
+      '宿主其实早就插进现场 profile 了；再 insert 只会报 already inserted，插件栏当时还故意列出它。',
+      'overlay:live insert 本身也比「写一行 yaml」重一点，但那是设计，这次的故障是先编这个包的 lib/。',
+    ].join('')
+    const prettyLead = [
+      '上次那一轮慢，是因为没有只跑这一条。',
+      '宿主其实早就插进现场 profile 了；再 insert 只会报 already inserted，插件栏当时还故意列出它。',
+      '',
+      'overlay:live insert 本身也比「写一行 yaml」重一点，但那是设计，不是这次的故障：',
+      '',
+      '- 先编这个包的 lib/',
+    ].join('\n')
+    let rewritten = fold(emptyChatFold(), {
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: rewrittenLead }] },
+    })
+    rewritten = fold(rewritten, {
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: prettyLead }] },
+    })
+    expect(rewritten.turns.filter(turn => turn.role === 'assistant')).toHaveLength(1)
+    expect(rewritten.turns.find(turn => turn.role === 'assistant')).toMatchObject({
+      text: prettyLead,
+    })
+    const rewrittenBands = settleStreaming({
+      turns: [
+        { id: 'a1', role: 'assistant', text: rewrittenLead },
+        { id: 'think', role: 'thinking', text: 'plan' },
+        { id: 'a2', role: 'assistant', text: prettyLead },
+      ],
+    })
+    expect(rewrittenBands.turns.filter(turn => turn.role === 'assistant')).toHaveLength(1)
+    expect(rewrittenBands.turns).toMatchObject([
+      { role: 'thinking', text: 'plan' },
+      { role: 'assistant', text: prettyLead },
+    ])
+    const shorts = settleStreaming({
+      turns: [
+        { id: 'a1', role: 'assistant', text: 'Hi.' },
+        { id: 'a2', role: 'assistant', text: 'Yo.' },
+      ],
+    })
+    expect(shorts.turns).toHaveLength(2)
+    const compactPrefix = settleStreaming({
+      turns: [
+        { id: 'a1', role: 'assistant', text: 'Hello   world' },
+        { id: 'a2', role: 'assistant', text: 'Hello world extra' },
+      ],
+    })
+    expect(compactPrefix.turns.filter(turn => turn.role === 'assistant')).toHaveLength(1)
+    const quoted = `${'甲'.repeat(32)}。`
+    const quotedLater = `lead ${quoted} tail`
+    const midQuote = settleStreaming({
+      turns: [
+        { id: 'a1', role: 'assistant', text: quoted },
+        { id: 'a2', role: 'assistant', text: quotedLater },
+      ],
+    })
+    expect(midQuote.turns.filter(turn => turn.role === 'assistant')).toHaveLength(1)
+    const compactMid = settleStreaming({
+      turns: [
+        { id: 'a1', role: 'assistant', text: `${'乙'.repeat(16)} ${'乙'.repeat(16)}。` },
+        { id: 'a2', role: 'assistant', text: `${'甲'.repeat(32)}。${'乙'.repeat(32)}。` },
+      ],
+    })
+    expect(compactMid.turns.filter(turn => turn.role === 'assistant')).toHaveLength(1)
   })
 
   it('truncates long tool JSON and skips non-JSON details', () => {
@@ -559,6 +993,7 @@ describe('hasMatchingRecentUser', () => {
 describe('toolHintFromDetail', () => {
   it('prefers path-like fields and clips long plain text', () => {
     expect(toolHintFromDetail('{"path":"src/a.ts"}')).toBe('src/a.ts')
+    expect(toolHintFromDetail('{"path":"src/a.ts"}…')).toBe('src/a.ts')
     expect(toolHintFromDetail('{"pattern":"foo"}')).toBe('foo')
     expect(toolHintFromDetail(undefined)).toBe('')
     expect(toolHintFromDetail('x'.repeat(80)).endsWith('…')).toBe(true)
@@ -574,6 +1009,22 @@ describe('task tool folding', () => {
     expect(toolCallIsBackground({
       taskToolCall: { result: { success: { is_background: true, agent_id: 'a1' } } },
     })).toBe(true)
+    expect(toolCallIsBackground({
+      taskToolCall: { result: { success: { isBackground: true } } },
+    })).toBe(true)
+    expect(toolCallIsBackground({
+      taskToolCall: { result: { is_background: true } },
+    })).toBe(true)
+    expect(toolCallIsBackground({
+      taskToolCall: { result: { isBackground: true } },
+    })).toBe(true)
+    expect(toolCallIsBackground({
+      taskToolCall: { result: { success: null } },
+    })).toBe(false)
+    expect(toolCallIsBackground({
+      taskToolCall: { result: { success: { done: true } } },
+    })).toBe(false)
+    expect(toolCallIsBackground({ taskToolCall: { args: { description: 'x' } } })).toBe(false)
 
     let state = fold(emptyChatFold(), {
       type: 'tool_call',
@@ -606,5 +1057,22 @@ describe('task tool folding', () => {
     })
     expect(state.turns[0]).toMatchObject({ background: true, status: 'done' })
     expect(countActiveTasks(state.turns)).toBe(2)
+    expect(countActiveTasks([
+      { id: 'u', role: 'user', text: 'hi' },
+      ...state.turns,
+      { id: 'g', role: 'tool', name: 'read', status: 'running', family: 'generic' },
+    ])).toBe(2)
+    state = fold(state, {
+      type: 'tool_call',
+      subtype: 'completed',
+      call_id: 't2',
+      tool_call: {
+        taskToolCall: {
+          args: { description: '盘点钉钉 DWS 技能' },
+          result: { success: { done: true } },
+        },
+      },
+    })
+    expect(countActiveTasks(state.turns)).toBe(1)
   })
 })

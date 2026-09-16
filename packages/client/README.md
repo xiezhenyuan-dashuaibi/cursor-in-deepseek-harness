@@ -27,12 +27,10 @@ This table is the client plugin inventory. Each package README owns that plugin'
 | [`ui-conversation/`](ui-conversation/README.md) | Presents the active conversation and its input surface. |
 | [`ui-cursor-agent/`](ui-cursor-agent/README.md) | Floats the official Cursor CLI TUI over the DSH conversation column. |
 | [`ui-float-window/`](ui-float-window/README.md) | Canonical reusable overlay card desk on `shell.overlay`; insert this package with `--title` / `--card-id` / `--width` / `--height` (repeat insert adds another card), then occupy `overlay-card.body`. |
-| [`ui-dew-journal/`](ui-dew-journal/README.md) | Occupant of `overlay-card.body`. Not in the default web-app roster. |
 | [`ui-overlay-desktop/`](ui-overlay-desktop/README.md) | Canonical reusable overlay desktop board on `shell.overlay`; insert this package, then occupy `overlay-desktop.body` (one occupant at a time). |
-| [`ui-dopamine-desk/`](ui-dopamine-desk/README.md) | Occupant of `overlay-desktop.body`. Not in the default web-app roster. |
-| [`ui-black-hole/`](ui-black-hole/README.md) | Occupant of `overlay-desktop.body`. Not in the default web-app roster. |
-| [`ui-koi-pond/`](ui-koi-pond/README.md) | Occupant of `overlay-desktop.body`. Not in the default web-app roster. |
-| [`ui-office-desk/`](ui-office-desk/README.md) | Occupant of `overlay-desktop.body`. Not in the default web-app roster. |
+| [`ui-overlay-shaped/`](ui-overlay-shaped/README.md) | Canonical reusable overlay shaped board on `shell.overlay`; insert this package, then occupy `overlay-shaped.body` (many occupants at once). |
+| [`ui-flower-pot/`](ui-flower-pot/README.md) | Occupant of `overlay-shaped.body`. Not in the default web-app roster. |
+| [`ui-television/`](ui-television/README.md) | Standalone CRT television fiber on `shell.overlay`. Not in the default web-app roster. |
 | [`ui-tool/`](ui-tool/README.md) | Composes Tool call trees and keyed per-Tool views. |
 | [`ui-workflow-run/`](ui-workflow-run/README.md) | Replays durable workflow runs as nested Chat disclosures with live-only child navigation. |
 | [`ui-goal/`](ui-goal/README.md) | Presents and manages the current goal. |

@@ -64,7 +64,7 @@ export function apply(ctx: Context) {
 
 ## Overlay 网页插件
 
-overlay 插件是普通 React 页面；有后端时则是普通 Node 服务。它组合进正在运行的 `dsh web`，并且不占据 `root`、也不重启该进程。CSS Modules 和宿主 RPC 按独立应用来写。**卡片窗口**形态复用 overlay 卡片、只写页面；加载 [dsh-overlay-web-plugins](../../.agents/skills/dsh-overlay-web-plugins/SKILL.md)。**桌面**形态复用 overlay 桌面基模、只写页面；加载 [dsh-overlay-canvas-plugins](../../.agents/skills/dsh-overlay-canvas-plugins/SKILL.md)。任意形状悬件仍是预留 skill [dsh-overlay-shaped-plugins](../../.agents/skills/dsh-overlay-shaped-plugins/SKILL.md)。现场插入用 `pnpm overlay:live` 写被监视的 profile patch，而不是 web-app 组合包文件。[overlay 网页插件](overlay-web-plugins.md)页是卡片形态在文档站点上的指针。[overlay 桌面插件](overlay-desktop-plugins.md)页是桌面形态的指针。
+overlay 插件是普通 React 页面；有后端时则是普通 Node 服务。它组合进正在运行的 `dsh web`，并且不占据 `root`、也不重启该进程。CSS Modules 和宿主 RPC 按独立应用来写。**卡片窗口**形态复用 overlay 卡片、只写页面；加载 [dsh-overlay-web-plugins](../../.agents/skills/dsh-overlay-web-plugins/SKILL.md)。**桌面**形态复用 overlay 桌面基模、只写页面；加载 [dsh-overlay-canvas-plugins](../../.agents/skills/dsh-overlay-canvas-plugins/SKILL.md)。任意形状悬件复用 overlay 异形基模、只写占用者；加载 [dsh-overlay-shaped-plugins](../../.agents/skills/dsh-overlay-shaped-plugins/SKILL.md)。现场插入用 `pnpm overlay:live` 写被监视的 profile patch，而不是 web-app 组合包文件。[overlay 网页插件](overlay-web-plugins.md)页是卡片形态在文档站点上的指针。[overlay 桌面插件](overlay-desktop-plugins.md)页是桌面形态的指针。[overlay 异形插件](overlay-shaped-plugins.md)页是异形形态的指针。
 
 ## 外部协议驱动
 

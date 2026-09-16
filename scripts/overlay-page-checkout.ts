@@ -1,7 +1,8 @@
 /**
- * Checkout landing for an overlay page occupant: inventory, aggregate
+ * Checkout landing for an overlay occupant: inventory, aggregate
  * tsconfig, Model Experience, and the web-app omit list. Inverse of
- * `overlay:new-page`. Never writes the web-app bundle patch.
+ * `overlay:new-page`, `overlay:new-desktop`, and `overlay:new-shaped`.
+ * Never writes the web-app bundle patch.
  */
 
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -21,8 +22,11 @@ export const OVERLAY_CARD_DIR = 'ui-float-window'
 /** Canonical desktop board: live remove unloads the board, not this checkout tree. */
 export const OVERLAY_DESKTOP_DIR = 'ui-overlay-desktop'
 
+/** Canonical shaped board: live remove unloads the board, not this checkout tree. */
+export const OVERLAY_SHAPED_DIR = 'ui-overlay-shaped'
+
 /** Occupant form that chooses inventory and tsconfig landing markers. */
-export type OverlayCheckoutForm = 'card' | 'desktop'
+export type OverlayCheckoutForm = 'card' | 'desktop' | 'shaped'
 
 const LANDING_FILES = {
   clientTsconfig: 'tsconfig.client.json',
@@ -41,7 +45,7 @@ const LANDING_FILES = {
  * rows when those checkout files exist. Never writes the web-app bundle patch.
  * @param repoRoot - repository root.
  * @param name - parsed page identity.
- * @param form - card body vs desktop body landing markers.
+ * @param form - card, desktop, or shaped body landing markers.
  */
 export function landCheckoutSurfaces(
   repoRoot: string,
@@ -50,6 +54,10 @@ export function landCheckoutSurfaces(
 ): void {
   if (form === 'desktop') {
     landDesktopCheckoutSurfaces(repoRoot, name)
+    return
+  }
+  if (form === 'shaped') {
+    landShapedCheckoutSurfaces(repoRoot, name)
     return
   }
   insertAfterMarker(
@@ -141,6 +149,51 @@ function landDesktopCheckoutSurfaces(repoRoot: string, name: OverlayPageIdentity
   )
 }
 
+function landShapedCheckoutSurfaces(repoRoot: string, name: OverlayPageIdentity): void {
+  insertAfterMarker(
+    join(repoRoot, LANDING_FILES.clientTsconfig),
+    '{ "path": "./packages/client/ui-overlay-shaped/tsconfig.client.json" },',
+    `    { "path": "./packages/client/${name.dirName}" },`,
+    `./packages/client/${name.dirName}`,
+  )
+  insertAfterMarker(
+    join(repoRoot, LANDING_FILES.baseTsconfig),
+    '"@deepseek-ai/dsh-client-ui-overlay-shaped": ["./packages/client/ui-overlay-shaped/src"],',
+    `      "${name.npmName}": ["./packages/client/${name.dirName}/src"],`,
+    name.npmName,
+  )
+  insertAfterMarker(
+    join(repoRoot, LANDING_FILES.inventoryEn),
+    '| [`ui-overlay-shaped/`](ui-overlay-shaped/README.md) | Canonical reusable overlay shaped board on `shell.overlay`; insert this package, then occupy `overlay-shaped.body` (many occupants at once). |',
+    `| [\`${name.dirName}/\`](${name.dirName}/README.md) | Occupant of \`overlay-shaped.body\`. Not in the default web-app roster. |`,
+    `[\`${name.dirName}/\`](${name.dirName}/README.md)`,
+  )
+  insertAfterMarker(
+    join(repoRoot, LANDING_FILES.inventoryZh),
+    '| [`ui-overlay-shaped/`](ui-overlay-shaped/README.md) | 规范的可复用 overlay 异形基模，占据 `shell.overlay`；插入本包后再占据 `overlay-shaped.body`（可同时多个占用者）。 |',
+    `| [\`${name.dirName}/\`](${name.dirName}/README.md) | \`overlay-shaped.body\` 的占用者。默认 web-app 名录不挂载。 |`,
+    `[\`${name.dirName}/\`](${name.dirName}/README.md)`,
+  )
+  insertAfterMarker(
+    join(repoRoot, LANDING_FILES.modelExperience),
+    "'packages/client/ui-overlay-shaped': { kind: 'none', reason: 'Reusable overlay shaped board; registers nothing model-facing.' },",
+    `  'packages/client/${name.dirName}': { kind: 'none', reason: 'Browser-only overlay-shaped.body occupant; registers nothing model-facing.' },`,
+    `'packages/client/${name.dirName}'`,
+  )
+  prependInFile(
+    join(repoRoot, LANDING_FILES.omitList),
+    'const OMITTED_IDS = [',
+    `const OMITTED_IDS = ['${name.dirName}', `,
+    `'${name.dirName}'`,
+  )
+  prependInFile(
+    join(repoRoot, LANDING_FILES.omitList),
+    'const OMITTED_PACKAGES = [',
+    `const OMITTED_PACKAGES = [\n  '${name.npmName}',`,
+    name.npmName,
+  )
+}
+
 /**
  * Strip landing rows for this occupant. Leaves the package directory in place.
  * @param repoRoot - repository root.
@@ -187,6 +240,7 @@ export function purgeCheckoutOccupant(repoRoot: string, dirName: string): boolea
 export function isLabOverlayOccupant(repoRoot: string, dirName: string): boolean {
   if (dirName === OVERLAY_CARD_DIR) return false
   if (dirName === OVERLAY_DESKTOP_DIR) return false
+  if (dirName === OVERLAY_SHAPED_DIR) return false
   if (isWebAppRosterPackage(repoRoot, dirName)) return false
   const dest = join(repoRoot, 'packages', 'client', dirName)
   if (!existsSync(dest)) return false

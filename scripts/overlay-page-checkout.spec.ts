@@ -131,7 +131,12 @@ describe('overlay-page-checkout', () => {
     writePackage(root, 'ui-notes')
     writePackage(root, 'ui-float-window')
     writePackage(root, 'ui-overlay-desktop')
+    writePackage(root, 'ui-overlay-shaped')
     writePackage(root, 'ui-cursor-agent')
+    writeFileSync(
+      join(root, 'packages', 'bundle', 'web-app', 'tests', 'lab-overlay-occupants.spec.ts'),
+      "const OMITTED_IDS = ['ui-overlay-shaped'] as const\nconst OMITTED_PACKAGES = [\n  '@deepseek-ai/dsh-client-ui-overlay-shaped',\n] as const\n",
+    )
     landCheckoutSurfaces(root, {
       dirName: 'ui-notes',
       npmName: '@deepseek-ai/dsh-client-ui-notes',
@@ -139,10 +144,12 @@ describe('overlay-page-checkout', () => {
     expect(isLabOverlayOccupant(root, 'ui-notes')).toBe(true)
     expect(isLabOverlayOccupant(root, 'ui-float-window')).toBe(false)
     expect(isLabOverlayOccupant(root, 'ui-overlay-desktop')).toBe(false)
+    expect(isLabOverlayOccupant(root, 'ui-overlay-shaped')).toBe(false)
     expect(isLabOverlayOccupant(root, 'ui-cursor-agent')).toBe(false)
     expect(purgeCheckoutOccupant(root, 'ui-notes')).toBe(true)
     expect(purgeCheckoutOccupant(root, 'ui-float-window')).toBe(false)
     expect(purgeCheckoutOccupant(root, 'ui-overlay-desktop')).toBe(false)
+    expect(purgeCheckoutOccupant(root, 'ui-overlay-shaped')).toBe(false)
     expect(purgeCheckoutOccupant(root, 'ui-cursor-agent')).toBe(false)
     expect(() => readFileSync(join(root, 'packages', 'client', 'ui-notes', 'package.json'))).toThrow()
     expect(readFileSync(join(root, 'packages', 'client', 'ui-float-window', 'package.json'), 'utf8')).toContain(
@@ -150,5 +157,50 @@ describe('overlay-page-checkout', () => {
     )
     expect(readFileSync(join(root, 'tsconfig.client.json'), 'utf8')).not.toContain('ui-notes')
     expect(readFileSync(join(root, 'packages', 'client', 'README.md'), 'utf8')).not.toContain('ui-notes')
+  })
+
+  it('lands a shaped occupant after the shaped host markers', () => {
+    const root = tempDir()
+    mkdirSync(join(root, 'packages', 'bundle', 'web-app', 'tests'), { recursive: true })
+    mkdirSync(join(root, 'packages', 'client'), { recursive: true })
+    mkdirSync(join(root, 'scripts'), { recursive: true })
+    writeFileSync(
+      join(root, 'tsconfig.client.json'),
+      '{ "references": [\n    { "path": "./packages/client/ui-overlay-shaped/tsconfig.client.json" },\n    { "path": "./packages/client/ui-tool" }\n  ] }\n',
+    )
+    writeFileSync(
+      join(root, 'tsconfig.base.json'),
+      '{ "compilerOptions": { "paths": {\n      "@deepseek-ai/dsh-client-ui-overlay-shaped": ["./packages/client/ui-overlay-shaped/src"],\n    } } }\n',
+    )
+    writeFileSync(
+      join(root, 'packages', 'client', 'README.md'),
+      '| [`ui-overlay-shaped/`](ui-overlay-shaped/README.md) | Canonical reusable overlay shaped board on `shell.overlay`; insert this package, then occupy `overlay-shaped.body` (many occupants at once). |\n| [`ui-tool/`](ui-tool/README.md) | Tools. |\n',
+    )
+    writeFileSync(
+      join(root, 'packages', 'client', 'README.zh.md'),
+      '| [`ui-overlay-shaped/`](ui-overlay-shaped/README.md) | 规范的可复用 overlay 异形基模，占据 `shell.overlay`；插入本包后再占据 `overlay-shaped.body`（可同时多个占用者）。 |\n| [`ui-tool/`](ui-tool/README.md) | 工具。 |\n',
+    )
+    writeFileSync(
+      join(root, 'scripts', 'verify-package-readme-model-experience.ts'),
+      '  \'packages/client/ui-overlay-shaped\': { kind: \'none\', reason: \'Reusable overlay shaped board; registers nothing model-facing.\' },\n',
+    )
+    writeFileSync(
+      join(root, 'packages', 'bundle', 'web-app', 'tests', 'lab-overlay-occupants.spec.ts'),
+      'const OMITTED_IDS = [\'ui-lab\'] as const\nconst OMITTED_PACKAGES = [\n  \'@deepseek-ai/dsh-client-ui-lab\',\n] as const\n',
+    )
+    landCheckoutSurfaces(root, {
+      dirName: 'ui-notes',
+      npmName: '@deepseek-ai/dsh-client-ui-notes',
+    }, 'shaped')
+    expect(readFileSync(join(root, 'tsconfig.client.json'), 'utf8')).toContain('./packages/client/ui-notes')
+    expect(readFileSync(join(root, 'packages', 'client', 'README.md'), 'utf8')).toContain(
+      'Occupant of `overlay-shaped.body`',
+    )
+    expect(readFileSync(join(root, 'scripts', 'verify-package-readme-model-experience.ts'), 'utf8'))
+      .toContain("'packages/client/ui-notes'")
+    expect(readFileSync(
+      join(root, 'packages', 'bundle', 'web-app', 'tests', 'lab-overlay-occupants.spec.ts'),
+      'utf8',
+    )).toContain("'ui-notes'")
   })
 })

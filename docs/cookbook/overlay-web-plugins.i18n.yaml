@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/cookbook/overlay-web-plugins.md
-overlay-web-plugins.md: 01fdd1f5654a5cba823d59f165fa7ccf71524afe
-overlay-web-plugins.zh.md: 902e4509a998c89f4d6a7619581a5563622e8aee
+overlay-web-plugins.md: 06fc52a947da48875bb3fc24009776b8ea7b8dba
+overlay-web-plugins.zh.md: 6b5362570f8c6e5b209f663cbf473ac88a4087ab

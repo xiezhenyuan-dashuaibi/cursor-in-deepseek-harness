@@ -400,6 +400,66 @@ describe('declaration injection', () => {
     expect(bench.svc.entries('t.host')[0]?.component).toBe(componentB)
   })
 
+  it('stamps registrant from the Loader entry npm name when the plugin omits name', async () => {
+    const bench = await boot()
+    bench.erased.register({
+      name: 'root', children: { 't.rows': { kind: 'list', scope: 'root' } },
+    }, C)
+    const occupant = bench.ctx.plugin({
+      inject: ['slots'],
+      apply: (ctx: Context) => {
+        (ctx.fiber as { entry?: { options: { name: string } } }).entry = {
+          options: { name: '@deepseek-ai/dsh-client-ui-flower-pot' },
+        }
+        ctx.slots.register({ name: 't.rows', id: 'flower-pot' }, C)
+      },
+    })
+    await occupant.await()
+    expect(bench.svc.entries('t.rows')[0]?.registrant)
+      .toBe('@deepseek-ai/dsh-client-ui-flower-pot')
+  })
+
+  it('keeps an explicit registrant over the Loader entry name', async () => {
+    const bench = await boot()
+    bench.erased.register({
+      name: 'root', children: { 't.rows': { kind: 'list', scope: 'root' } },
+    }, C)
+    const occupant = bench.ctx.plugin({
+      name: 'named-plugin',
+      inject: ['slots'],
+      apply: (ctx: Context) => {
+        (ctx.fiber as { entry?: { options: { name: string } } }).entry = {
+          options: { name: '@deepseek-ai/dsh-client-ui-flower-pot' },
+        }
+        ctx.slots.register(
+          { name: 't.rows', id: 'flower-pot', registrant: 'explicit-id' },
+          C,
+        )
+      },
+    })
+    await occupant.await()
+    expect(bench.svc.entries('t.rows')[0]?.registrant).toBe('explicit-id')
+  })
+
+  it('stamps registrant from plugin name when the Loader entry name is empty', async () => {
+    const bench = await boot()
+    bench.erased.register({
+      name: 'root', children: { 't.rows': { kind: 'list', scope: 'root' } },
+    }, C)
+    const occupant = bench.ctx.plugin({
+      name: 'named-plugin',
+      inject: ['slots'],
+      apply: (ctx: Context) => {
+        (ctx.fiber as { entry?: { options: { name: string } } }).entry = {
+          options: { name: '' },
+        }
+        ctx.slots.register({ name: 't.rows', id: 'flower-pot' }, C)
+      },
+    })
+    await occupant.await()
+    expect(bench.svc.entries('t.rows')[0]?.registrant).toBe('named-plugin')
+  })
+
   it('releases service-layer store state when the declaration collapses', async () => {
     const bench = await boot()
     let host: SlotRendererHost | undefined

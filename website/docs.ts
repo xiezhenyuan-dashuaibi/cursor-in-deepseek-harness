@@ -425,6 +425,14 @@ const reference = [
     section: { root: '开发手册', en: 'Cookbook' },
     order: 6,
   }]),
+  ...pairedPages([{
+    source: 'docs/cookbook/overlay-shaped-plugins.md',
+    route: 'reference/cookbook/overlay-shaped-plugins.md',
+    label: { root: 'Overlay 异形插件', en: 'Overlay shaped plugins' },
+    sidebar: { root: 'zh-reference', en: 'en-reference' },
+    section: { root: '开发手册', en: 'Cookbook' },
+    order: 7,
+  }]),
 ]
 
 /** A sidebar group, matched to pages by `label`. */

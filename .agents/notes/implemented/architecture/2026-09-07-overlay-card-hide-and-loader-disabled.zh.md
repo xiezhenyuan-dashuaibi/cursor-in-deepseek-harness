@@ -18,7 +18,7 @@ Cursor 轨上的插入/拔出只写名册标志并跳过桌面挂载。占用者
 
 宿主 `/overlay-card`（以及现场 `./overlay-card-plug-rpc.mjs` 的 `/overlay-card-plug`）提供 `instances.setHidden` 和 `occupants.setInserted`。卡片包的 `overlay:live update` 会写 `./overlay-card-hide-rpc.mjs`，并把已有的 plug-rpc Loader `name` 改到该 specifier，以便已经 import 过第一个 plug-rpc URL 的进程在 `/overlay-card-plug` 上重新挂上这些处理。`setInserted` 拒绝不在该卡 `occupants` 上的 id，拒绝桌面 / 桌面基模 / Cursor / RPC 辅助 id（`ui-float-window`、`ui-overlay-desktop`、`ui-cursor-agent` / `cursor-agent`、`overlay-card-roster-rpc`、`overlay-card-plug-rpc`、`overlay-card-hide-rpc`、`overlay-card-rpc`、`overlay-plugin-roster-rpc`、`overlay-plugin-rail-rpc`），并使用 trusted-host 权限。`overlay:live` 解析/转储会保留插入行上的 `disabled: true`，因此之后再插入别的包不会把已拔出的占用者重新启用。
 
-Cursor 插件浮层列出卡片行 `{ id, title, hidden, inserted, occupants }`，再加上 `/overlay-plugins-rail` 然后 `/overlay-plugins` 上的桌面占用者和独立 overlay fiber，并且只给卡片提供隐藏/显示。fiber 和桌面行用 Loader `disabled` 拔出；桌面产品没有隐藏文件（[桌面基模](2026-09-10-overlay-desktop-host.md)）。fiber 隐藏不是第二个 `disabled`（[轨上的 fiber](2026-09-10-overlay-plugin-rail-fibers.md)）。Overlay 叠放与轨铬框仍由 [overlay 叠放](2026-09-07-overlay-stack-and-card-plug.md) 拥有。
+Cursor 插件浮层列出卡片行 `{ id, title, hidden, inserted, occupants }`，再加上 `/overlay-plugins-rail` 然后 `/overlay-plugins` 上的桌面占用者和独立 overlay fiber，并且给卡片和异形占用者提供隐藏/显示（[异形隐藏](2026-09-14-overlay-shaped-hide.md)）。fiber 和桌面行用 Loader `disabled` 拔出；桌面产品没有隐藏文件（[桌面基模](2026-09-10-overlay-desktop-host.md)）。fiber 隐藏不是第二个 `disabled`（[轨上的 fiber](2026-09-10-overlay-plugin-rail-fibers.md)）。Overlay 叠放与轨铬框仍由 [overlay 叠放](2026-09-07-overlay-stack-and-card-plug.md) 拥有。
 
 ## Alternatives considered
 

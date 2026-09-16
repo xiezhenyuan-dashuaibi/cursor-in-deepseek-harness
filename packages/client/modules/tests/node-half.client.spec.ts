@@ -197,6 +197,14 @@ describe('client bundle activation', () => {
     expect(construct(['@fixture/desktop-overlay-body']).graph().entries.map(entry => entry.id)).toEqual([
       '@fixture/desktop-overlay-body',
     ])
+    const shapedPath = writePackage('@fixture/shaped-overlay-body', {
+      dsh: { client: { platform: 'web', overlayBody: 'overlay-shaped.body' } },
+    })
+    mkdirSync(dirname(shapedPath), { recursive: true })
+    writeFileSync(shapedPath, 'module.exports = {}\n')
+    expect(construct(['@fixture/shaped-overlay-body']).graph().entries.map(entry => entry.id)).toEqual([
+      '@fixture/shaped-overlay-body',
+    ])
     const numberedPath = writePackage('@fixture/numbered-overlay-body', {
       dsh: { client: { platform: 'web', overlayBody: 'overlay-card-10.body' } },
     })

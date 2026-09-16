@@ -41,6 +41,7 @@ describe('overlay-card instances', () => {
     expect(parseOverlayCardInstanceId('ui-float-window')).toBeUndefined()
     expect(isProtectedOverlayCardLoaderId('ui-float-window')).toBe(true)
     expect(isProtectedOverlayCardLoaderId('ui-overlay-desktop')).toBe(true)
+    expect(isProtectedOverlayCardLoaderId('ui-overlay-shaped')).toBe(true)
     expect(isProtectedOverlayCardLoaderId('overlay-card-plug-rpc')).toBe(true)
     expect(isProtectedOverlayCardLoaderId('overlay-card-hide-rpc')).toBe(true)
     expect(isProtectedOverlayCardLoaderId('overlay-plugin-roster-rpc')).toBe(true)

@@ -7,8 +7,8 @@
  * `occupants.setInserted` can mount beside a cached list-only `/overlay-card`
  * handler. Any insert or update also writes `./overlay-plugin-roster-rpc.mjs`
  * and `./overlay-plugin-rail-rpc.mjs` so `/overlay-plugins-rail` can list
- * desktop occupants when the cached `ui-cursor-agent` `apply` already owns
- * `/overlay-plugins`.
+ * desktop occupants and shaped fibers (hide plus unplug) when the cached
+ * `ui-cursor-agent` `apply` already owns `/overlay-plugins`.
  */
 
 import { spawnSync } from 'node:child_process'
@@ -44,8 +44,12 @@ import {
   OVERLAY_PLUGIN_RAIL_RPC_ID,
   OVERLAY_PLUGIN_RPC_CHANNEL,
   OVERLAY_PLUGIN_ROSTER_RPC_ID,
+  OVERLAY_PLUGIN_SET_HIDDEN_ENDPOINT,
   OVERLAY_PLUGIN_SET_INSERTED_ENDPOINT,
   OVERLAY_PLUGIN_SWITCH_DESKTOP_ENDPOINT,
+  OVERLAY_SHAPED_BODY_SLOT,
+  OVERLAY_SHAPED_HIDDEN_FILE,
+  OVERLAY_SHAPED_PACKAGE_NAME,
   setDesktopOccupantExclusive,
 } from '../packages/client/ui-cursor-agent/src/plugin-roster.ts'
 import { purgeCheckoutOccupant } from './overlay-page-checkout.ts'
@@ -881,12 +885,26 @@ export async function runOverlayLivePlugin(argv: string[], options: OverlayLiveO
       return `overlay-live-plugin: desktop host already inserted (${existing.id})`
     }
   }
+  if (parsed.command === 'insert' && source.name === OVERLAY_SHAPED_PACKAGE_NAME) {
+    const existing = findInsertRowByName(patch.entries, source.name)
+    if (existing !== undefined) {
+      await ensureOverlayPluginRosterChannel(profileRoot, patchPath)
+      return `overlay-live-plugin: shaped host already inserted (${existing.id})`
+    }
+  }
   if (
     parsed.command === 'insert'
     && overlayBodyFromClient(source.dsh?.client) === OVERLAY_DESKTOP_BODY_SLOT
     && findInsertRowByName(patch.entries, OVERLAY_DESKTOP_PACKAGE_NAME) === undefined
   ) {
     throw new Error('overlay-live-plugin: overlay desktop plugin is not loaded')
+  }
+  if (
+    parsed.command === 'insert'
+    && overlayBodyFromClient(source.dsh?.client) === OVERLAY_SHAPED_BODY_SLOT
+    && findInsertRowByName(patch.entries, OVERLAY_SHAPED_PACKAGE_NAME) === undefined
+  ) {
+    throw new Error('overlay-live-plugin: overlay shaped plugin is not loaded')
   }
   const id = parsed.id
     ?? findInsertRowByName(patch.entries, source.name)?.id
@@ -1355,7 +1373,7 @@ export function overlayCardRosterRpcSource(channel: string = OVERLAY_CARD_RPC_CH
     `const SET_INSERTED = ${setInserted}`,
     `const INSTANCES = ${instances}`,
     `const FALLBACK = ${fallback}`,
-    "const PROTECTED = new Set(['ui-float-window', 'ui-overlay-desktop', 'ui-cursor-agent', 'cursor-agent', 'overlay-card-roster-rpc', 'overlay-card-plug-rpc', 'overlay-card-hide-rpc', 'overlay-card-rpc', 'overlay-plugin-roster-rpc', 'overlay-plugin-rail-rpc'])",
+    "const PROTECTED = new Set(['ui-float-window', 'ui-overlay-desktop', 'ui-overlay-shaped', 'ui-cursor-agent', 'cursor-agent', 'overlay-card-roster-rpc', 'overlay-card-plug-rpc', 'overlay-card-hide-rpc', 'overlay-card-rpc', 'overlay-plugin-roster-rpc', 'overlay-plugin-rail-rpc'])",
     '',
     'function isMissing(error) {',
     "  return error instanceof Error && 'code' in error && error.code === 'ENOENT'",
@@ -1585,9 +1603,10 @@ export function overlayCardRosterRpcSource(channel: string = OVERLAY_CARD_RPC_CH
 }
 
 /**
- * Profile-relative host module that lists overlay fibers and desktop
- * occupants and writes Loader `disabled`. Duplicate `rpc.handle` is ignored
- * so a later boot where package `apply` also registers does not fail the fiber.
+ * Profile-relative host module that lists overlay fibers, shaped occupants,
+ * and desktop occupants, writes Loader `disabled`, and writes shaped-host
+ * `hidden.json`. Duplicate `rpc.handle` is ignored so a later boot where
+ * package `apply` also registers does not fail the fiber.
  */
 export function overlayPluginRosterRpcSource(
   channel: string = OVERLAY_PLUGIN_RPC_CHANNEL,
@@ -1595,13 +1614,17 @@ export function overlayPluginRosterRpcSource(
   const channelJson = JSON.stringify(channel)
   const list = JSON.stringify(OVERLAY_PLUGIN_LIST_ENDPOINT)
   const setInserted = JSON.stringify(OVERLAY_PLUGIN_SET_INSERTED_ENDPOINT)
+  const setHidden = JSON.stringify(OVERLAY_PLUGIN_SET_HIDDEN_ENDPOINT)
   const switchDesktop = JSON.stringify(OVERLAY_PLUGIN_SWITCH_DESKTOP_ENDPOINT)
   const rosterId = JSON.stringify(OVERLAY_PLUGIN_ROSTER_RPC_ID)
   const railId = JSON.stringify(OVERLAY_PLUGIN_RAIL_RPC_ID)
   const desktopBody = JSON.stringify(OVERLAY_DESKTOP_BODY_SLOT)
   const hostName = JSON.stringify(OVERLAY_DESKTOP_PACKAGE_NAME)
+  const shapedBody = JSON.stringify(OVERLAY_SHAPED_BODY_SLOT)
+  const shapedPkg = JSON.stringify(OVERLAY_SHAPED_PACKAGE_NAME)
+  const hiddenFile = JSON.stringify(OVERLAY_SHAPED_HIDDEN_FILE)
   return [
-    "import { readFileSync, writeFileSync } from 'node:fs'",
+    "import { readdirSync, readFileSync, writeFileSync } from 'node:fs'",
     "import { dirname, join } from 'node:path'",
     "import { fileURLToPath } from 'node:url'",
     '',
@@ -1610,10 +1633,14 @@ export function overlayPluginRosterRpcSource(
     `const CHANNEL = ${channelJson}`,
     `const LIST = ${list}`,
     `const SET_INSERTED = ${setInserted}`,
+    `const SET_HIDDEN = ${setHidden}`,
     `const SWITCH_DESKTOP = ${switchDesktop}`,
     `const DESKTOP_BODY = ${desktopBody}`,
     `const HOST_NAME = ${hostName}`,
-    `const PROTECTED = new Set(['ui-float-window', 'ui-overlay-desktop', 'ui-cursor-agent', 'cursor-agent', 'overlay-card-roster-rpc', 'overlay-card-plug-rpc', 'overlay-card-hide-rpc', 'overlay-card-rpc', ${rosterId}, ${railId}])`,
+    `const SHAPED_BODY = ${shapedBody}`,
+    `const SHAPED_PKG = ${shapedPkg}`,
+    `const HIDDEN_FILE = ${hiddenFile}`,
+    `const PROTECTED = new Set(['ui-float-window', 'ui-overlay-desktop', 'ui-overlay-shaped', 'ui-cursor-agent', 'cursor-agent', 'overlay-card-roster-rpc', 'overlay-card-plug-rpc', 'overlay-card-hide-rpc', 'overlay-card-rpc', ${rosterId}, ${railId}])`,
     '',
     'function isMissing(error) {',
     "  return error instanceof Error && 'code' in error && error.code === 'ENOENT'",
@@ -1681,10 +1708,13 @@ export function overlayPluginRosterRpcSource(
     '  const pkg = readPkg(pluginsDir, id)',
     '  if (pkg === undefined) return undefined',
     '  if (pkg.name === HOST_NAME) return undefined',
+    '  if (pkg.name === SHAPED_PKG) return undefined',
     '  const client = dshClient(pkg)',
     '  if (client === undefined) return undefined',
     '  if (typeof client.overlayBody === \'string\') {',
-    '    return client.overlayBody === DESKTOP_BODY ? \'desktop\' : undefined',
+    '    if (client.overlayBody === DESKTOP_BODY) return \'desktop\'',
+    '    if (client.overlayBody === SHAPED_BODY) return \'shaped\'',
+    '    return undefined',
     '  }',
     "  return 'fiber'",
     '}',
@@ -1698,9 +1728,76 @@ export function overlayPluginRosterRpcSource(
     '  return id',
     '}',
     '',
+    'function moduleNameOf(id, pluginsDir) {',
+    '  const pkg = readPkg(pluginsDir, id)',
+    "  return typeof pkg?.name === 'string' ? pkg.name : ''",
+    '}',
+    '',
+    'function findShapedHostDir(pluginsDir) {',
+    '  let names',
+    '  try {',
+    '    names = readdirSync(pluginsDir)',
+    '  } catch (error) {',
+    '    if (isMissing(error)) return undefined',
+    '    throw error',
+    '  }',
+    '  for (const name of names) {',
+    '    const pkg = readPkg(pluginsDir, name)',
+    '    if (pkg?.name === SHAPED_PKG) return join(pluginsDir, name)',
+    '  }',
+    '  return undefined',
+    '}',
+    '',
+    'function parseHiddenFile(text) {',
+    '  let parsed',
+    '  try {',
+    '    parsed = JSON.parse(text)',
+    '  } catch {',
+    '    return []',
+    '  }',
+    "  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return []",
+    '  if (!Array.isArray(parsed.hidden)) return []',
+    '  const ids = []',
+    '  const seen = new Set()',
+    '  for (const id of parsed.hidden) {',
+    "    if (typeof id !== 'string' || id.length === 0 || seen.has(id)) continue",
+    '    seen.add(id)',
+    '    ids.push(id)',
+    '  }',
+    '  return ids',
+    '}',
+    '',
+    'function readHiddenIds(pluginsDir) {',
+    '  const hostDir = findShapedHostDir(pluginsDir)',
+    '  if (hostDir === undefined) return []',
+    '  try {',
+    "    return parseHiddenFile(readFileSync(join(hostDir, HIDDEN_FILE), 'utf8'))",
+    '  } catch (error) {',
+    '    if (isMissing(error)) return []',
+    '    throw error',
+    '  }',
+    '}',
+    '',
+    'function writeHiddenIds(pluginsDir, ids) {',
+    '  const hostDir = findShapedHostDir(pluginsDir)',
+    '  if (hostDir === undefined) {',
+    "    throw new Error('overlay-plugins: overlay shaped plugin is not loaded')",
+    '  }',
+    "  writeFileSync(join(hostDir, HIDDEN_FILE), JSON.stringify({ hidden: [...ids] }, null, 2) + '\\n')",
+    '}',
+    '',
+    'function setHiddenId(pluginsDir, id, hidden) {',
+    "  if (railKind(id, pluginsDir) !== 'shaped') {",
+    "    throw new Error('overlay-plugins: ' + JSON.stringify(id) + ' is not a shaped occupant')",
+    '  }',
+    '  const next = readHiddenIds(pluginsDir).filter(item => item !== id)',
+    '  writeHiddenIds(pluginsDir, hidden ? [...next, id] : next)',
+    '}',
+    '',
     'function listed(patchText, pluginsDir) {',
     '  const plugins = []',
     '  let desktop = null',
+    '  const hiddenIds = new Set(readHiddenIds(pluginsDir))',
     '  for (const block of loaderRowBlocks(patchText.split(/\\n/))) {',
     '    const kind = railKind(block.id, pluginsDir)',
     '    if (kind === undefined) continue',
@@ -1708,10 +1805,11 @@ export function overlayPluginRosterRpcSource(
     '    const item = {',
     '      id: block.id,',
     '      title: titleOf(block.id, pluginsDir),',
-    '      hidden: false,',
+    "      hidden: kind === 'shaped' && hiddenIds.has(block.id),",
     '      inserted,',
     '      occupants: [block.id],',
     '      kind,',
+    '      moduleName: moduleNameOf(block.id, pluginsDir),',
     '    }',
     "    if (kind === 'desktop' && inserted && desktop === null) {",
     '      desktop = item',
@@ -1803,6 +1901,20 @@ export function overlayPluginRosterRpcSource(
     '        }',
     '        return { ok: true, value: listedFromDisk(patchPath, pluginsDir) }',
     '      }',
+    '      if (endpoint === SET_HIDDEN) {',
+    '        if (payload === null || typeof payload !== \'object\' || Array.isArray(payload)) {',
+    "          return badRequest('overlay-plugins: plugins.setHidden needs { id, hidden }')",
+    '        }',
+    '        if (typeof payload.id !== \'string\' || payload.id.length === 0 || typeof payload.hidden !== \'boolean\') {',
+    "          return badRequest('overlay-plugins: plugins.setHidden needs { id, hidden }')",
+    '        }',
+    '        try {',
+    '          setHiddenId(pluginsDir, payload.id, payload.hidden)',
+    '        } catch (error) {',
+    "          return badRequest(error instanceof Error ? error.message : 'overlay-plugins: setHidden failed')",
+    '        }',
+    '        return { ok: true, value: listedFromDisk(patchPath, pluginsDir) }',
+    '      }',
     '      if (endpoint === SWITCH_DESKTOP) {',
     '        if (payload === null || typeof payload !== \'object\' || Array.isArray(payload)) {',
     "          return badRequest('overlay-plugins: plugins.switchDesktop needs { id }')",
@@ -1837,17 +1949,25 @@ async function bindOverlayCardOccupant(
   source: CheckoutManifest & { name: string },
   loaderId: string,
 ): Promise<void> {
-  if (source.name === OVERLAY_CARD_PACKAGE_NAME || source.name === OVERLAY_DESKTOP_PACKAGE_NAME) return
+  if (
+    source.name === OVERLAY_CARD_PACKAGE_NAME
+    || source.name === OVERLAY_DESKTOP_PACKAGE_NAME
+    || source.name === OVERLAY_SHAPED_PACKAGE_NAME
+  ) return
   const body = overlayBodyFromClient(source.dsh?.client)
   if (body === undefined) return
   if (body === OVERLAY_DESKTOP_BODY_SLOT) {
     await bindOverlayDesktopOccupant(profileRoot, patchPath, loaderId)
     return
   }
+  if (body === OVERLAY_SHAPED_BODY_SLOT) {
+    await bindOverlayShapedOccupant(patchPath)
+    return
+  }
   const seat = overlayCardSeatFromBodySlot(body)
   if (seat === undefined) {
     throw new Error(
-      `overlay-live-plugin: dsh.client.overlayBody ${JSON.stringify(body)} must be overlay-card.body, overlay-card-N.body, or overlay-desktop.body`,
+      `overlay-live-plugin: dsh.client.overlayBody ${JSON.stringify(body)} must be overlay-card.body, overlay-card-N.body, overlay-desktop.body, or overlay-shaped.body`,
     )
   }
   const patch = parseProfilePatch(await readFile(patchPath, 'utf8'))
@@ -1872,6 +1992,15 @@ async function bindOverlayDesktopOccupant(
   const pluginsDir = join(profileRoot, 'plugins')
   const next = setDesktopOccupantExclusive(await readFile(patchPath, 'utf8'), pluginsDir, loaderId)
   await writeFile(patchPath, next)
+}
+
+async function bindOverlayShapedOccupant(
+  patchPath: string,
+): Promise<void> {
+  const patch = parseProfilePatch(await readFile(patchPath, 'utf8'))
+  if (findInsertRowByName(patch.entries, OVERLAY_SHAPED_PACKAGE_NAME) === undefined) {
+    throw new Error('overlay-live-plugin: overlay shaped plugin is not loaded')
+  }
 }
 
 function overlayBodyFromClient(client: unknown): string | undefined {

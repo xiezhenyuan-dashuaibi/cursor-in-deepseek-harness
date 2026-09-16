@@ -6,13 +6,13 @@ Status: implemented
 
 ## Problem
 
-`overlay:new-page` 与 `overlay:new-desktop` 已经禁止把另一个占用者当包骨架来克隆。overlay agent 仍会搜索、grep 或打开兄弟占用者的 `Page.tsx` / `Page.module.css` / locales，或把当前画着的桌面当模板，再做出一角玻璃 HUD（时钟、kicker、统计、主按钮挤在一块浮垫上）。操作者于是在每张新桌面上看到同一块左下角面板，新卡片上也出现类似克隆布局，即使任务并未要求沿用某个已有产品。
+`overlay:new-page`、`overlay:new-desktop` 与 `overlay:new-shaped` 已经禁止把另一个占用者当包骨架来克隆。overlay agent 仍会搜索、grep 或打开兄弟占用者的 `Page.tsx` / `Occupant.tsx` / `*.module.css` / locales，或把当前画着的桌面或悬件当模板，再做出一角玻璃 HUD（时钟、kicker、统计、主按钮挤在一块浮垫上）或另一个产品的剪影。操作者于是在每张新桌面上看到同一块左下角面板，新卡片和悬件上也出现类似克隆布局，即使任务并未要求沿用某个已有产品。
 
 ## Decision
 
-新的 overlay 占用者页面从其产品任务说明和这个新包里的生成器占位发明构图。该页面前端保持独立：不沿用另一个 overlay 占用者的风格。不要搜索、grep 或打开另一个 overlay 占用者的 `Page.tsx`、`Page.module.css`、locales 或页面测试当作参考。不要把当前画着的桌面或卡片当布局模板。只有用户明确要求做一个与某个产品类似的东西时，才打开那个占用者的页面前端。宿主铬框仍是 [`ui-float-window`](../../../../packages/client/ui-float-window/README.md) 或 [`ui-overlay-desktop`](../../../../packages/client/ui-overlay-desktop/README.md)；那些包只插入，不是页面模板。共用外观是 `--dsw-alias-*` 和 [web styling](../../../../docs/web-styling.md)，不是兄弟产品的 CSS。桌面点击穿透（基模 `pointer-events: none`，本页自己的命中目标为 `auto`）管的是哪些节点吃点击；它并不要求把控件挤进一角垫子。
+新的 overlay 占用者页面从其产品任务说明和这个新包里的生成器占位发明构图。该页面前端保持独立：不沿用另一个 overlay 占用者的风格。不要搜索、grep 或打开另一个 overlay 占用者的 `Page.tsx`、`Occupant.tsx`、`*.module.css`、locales 或页面测试当作参考。不要把当前画着的桌面、卡片或悬件当布局模板。只有用户明确要求做一个与某个产品类似的东西时，才打开那个占用者的页面前端。宿主铬框仍是 [`ui-float-window`](../../../../packages/client/ui-float-window/README.md)、[`ui-overlay-desktop`](../../../../packages/client/ui-overlay-desktop/README.md) 或 [`ui-overlay-shaped`](../../../../packages/client/ui-overlay-shaped/README.md)；那些包只插入，不是页面模板。共用外观是 `--dsw-alias-*` 和 [web styling](../../../../docs/web-styling.md)，不是兄弟产品的 CSS。桌面与异形点击穿透（基模 `pointer-events: none`，本占用者自己的命中目标为 `auto`）管的是哪些节点吃点击；它并不要求把控件挤进一角垫子。
 
-操作 HOW：[dsh-overlay-web-plugins](../../../skills/dsh-overlay-web-plugins/SKILL.md)、[dsh-overlay-canvas-plugins](../../../skills/dsh-overlay-canvas-plugins/SKILL.md)。包写入器：[overlay new page](2026-09-05-overlay-new-page.md)、[overlay new desktop](2026-09-10-overlay-new-desktop.md)。占用者名称不进 skill（[描述注册表](2026-09-05-client-plugin-description-registry.md)）。
+操作 HOW：[dsh-overlay-web-plugins](../../../skills/dsh-overlay-web-plugins/SKILL.md)、[dsh-overlay-canvas-plugins](../../../skills/dsh-overlay-canvas-plugins/SKILL.md)、[dsh-overlay-shaped-plugins](../../../skills/dsh-overlay-shaped-plugins/SKILL.md)。包写入器：[overlay new page](2026-09-05-overlay-new-page.md)、[overlay new desktop](2026-09-10-overlay-new-desktop.md)、[overlay new shaped](2026-09-14-overlay-new-shaped.md)。占用者名称不进 skill（[描述注册表](2026-09-05-client-plugin-description-registry.md)）。
 
 ## Alternatives considered
 
@@ -24,7 +24,7 @@ Status: implemented
 
 ## Consequences
 
-Overlay Cursor 常驻规则、skill YAML 摘要、两份形态 skill、`packages/client/AGENTS.md` 以及 overlay cookbook 写明：新页面从任务说明和生成器占位发明画面；agent 不去搜索、grep 或打开另一个占用者的页面前端作参考；只有用户明确要求做一个与那个产品类似的东西时，才把另一个占用者的前端当布局模板。写入器仍拥有包骨架；本笔记拥有占位出现之后的布局独立。
+Overlay Cursor 常驻规则、skill YAML 摘要、三份形态 skill、`packages/client/AGENTS.md` 以及 overlay cookbook 写明：新页面从任务说明和生成器占位发明画面；agent 不去搜索、grep 或打开另一个占用者的页面前端作参考；只有用户明确要求做一个与那个产品类似的东西时，才把另一个占用者的前端当布局模板。写入器仍拥有包骨架；本笔记拥有占位出现之后的布局独立。
 
 ## Testing
 

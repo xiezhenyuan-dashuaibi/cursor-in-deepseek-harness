@@ -2,12 +2,15 @@
  * Cursor rail roster for overlay fibers: live profile Loader rows that
  * declare `dsh.client` and are not a card page, the card desk, the desktop
  * board, Cursor, or an overlay RPC sidecar. Desktop occupants occupy
- * `overlay-desktop.body` (one inserted at a time). Other fibers have no
- * `overlayBody`. Unplug writes Loader `disabled`. Desktop products have no
- * hide file.
+ * `overlay-desktop.body` (one inserted at a time). Shaped occupants
+ * (`overlay-shaped.body`, many at a time) list as `shaped` with hide plus
+ * unplug. The shaped board is unlistable, like the desktop board. Other
+ * fibers have no `overlayBody`. Unplug writes Loader `disabled`. Hide for
+ * shaped occupants writes the host `hidden.json` and keeps the silhouette
+ * mounted. Desktop products have no hide file.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
@@ -31,6 +34,12 @@ export const OVERLAY_PLUGIN_LIST_ENDPOINT = 'plugins.list'
 /** Endpoint that sets Loader `disabled` on one rail plugin id. */
 export const OVERLAY_PLUGIN_SET_INSERTED_ENDPOINT = 'plugins.setInserted'
 
+/** Endpoint that writes shaped-host `hidden.json` for one occupant Loader id. */
+export const OVERLAY_PLUGIN_SET_HIDDEN_ENDPOINT = 'plugins.setHidden'
+
+/** Hide file next to the live shaped-host plugin `lib/` copy. */
+export const OVERLAY_SHAPED_HIDDEN_FILE = 'hidden.json'
+
 /** Endpoint that exclusive-enables one `overlay-desktop.body` occupant. */
 export const OVERLAY_PLUGIN_SWITCH_DESKTOP_ENDPOINT = 'plugins.switchDesktop'
 
@@ -43,13 +52,21 @@ export const OVERLAY_DESKTOP_PACKAGE_NAME = '@deepseek-ai/dsh-client-ui-overlay-
 /** Body slot occupied by the single desktop product page. */
 export const OVERLAY_DESKTOP_BODY_SLOT = 'overlay-desktop.body'
 
+/** npm name of the reusable shaped board. */
+export const OVERLAY_SHAPED_PACKAGE_NAME = '@deepseek-ai/dsh-client-ui-overlay-shaped'
+
+/** List slot occupied by concurrent shaped product plugins. */
+export const OVERLAY_SHAPED_BODY_SLOT = 'overlay-shaped.body'
+
 /**
  * Loader ids this roster must not list or disable. Desk, desktop board,
- * Cursor, and overlay RPC sidecars stay mounted.
+ * shaped board, Cursor, and overlay RPC sidecars stay mounted. Occupant
+ * rows carry hide plus unplug, matching card windows.
  */
 const PROTECTED_LOADER_IDS: ReadonlySet<string> = new Set([
   'ui-float-window',
   'ui-overlay-desktop',
+  'ui-overlay-shaped',
   'ui-cursor-agent',
   'cursor-agent',
   'overlay-card-roster-rpc',
@@ -61,7 +78,7 @@ const PROTECTED_LOADER_IDS: ReadonlySet<string> = new Set([
 ])
 
 /** How the rail treats this Loader row. */
-export type OverlayRailKind = 'fiber' | 'desktop'
+export type OverlayRailKind = 'fiber' | 'desktop' | 'shaped'
 
 /** One overlay fiber as the plugin panel lists it. */
 export interface OverlayStandalonePlugin {
@@ -69,7 +86,7 @@ export interface OverlayStandalonePlugin {
   readonly id: string
   /** Rail name from `dsh.client.panelTitle`, or the Loader id. */
   readonly title: string
-  /** Always `false` for desktop and fiber rows (no hide file). */
+  /** `true` when a shaped occupant is in the host hide file. Always `false` for desktop and other fibers. */
   readonly hidden: boolean
   /** `false` when the Loader row is `disabled: true` or missing. */
   readonly inserted: boolean
@@ -77,6 +94,8 @@ export interface OverlayStandalonePlugin {
   readonly occupants: readonly string[]
   /** Discriminator for the rail; cards omit this or send `card`. */
   readonly kind: OverlayRailKind
+  /** npm package name from the live copy, when present. */
+  readonly moduleName: string
 }
 
 /** Pinned desktop occupant plus the lower rail list. */
@@ -164,6 +183,7 @@ export function resolveRosterPaths(
 export function listOverlayRailPlugins(patchText: string, pluginsDir: string): OverlayRailRoster {
   let desktop: OverlayStandalonePlugin | null = null
   const plugins: OverlayStandalonePlugin[] = []
+  const hiddenIds = new Set(readShapedHiddenIds(pluginsDir))
   for (const row of scanLoaderRows(patchText)) {
     const kind = overlayRailKind(row.id, pluginsDir)
     if (kind === undefined) continue
@@ -171,10 +191,11 @@ export function listOverlayRailPlugins(patchText: string, pluginsDir: string): O
     const item: OverlayStandalonePlugin = {
       id: row.id,
       title: standalonePluginTitle(row.id, pluginsDir),
-      hidden: false,
+      hidden: kind === 'shaped' && hiddenIds.has(row.id),
       inserted,
       occupants: [row.id],
       kind,
+      moduleName: standalonePluginModuleName(row.id, pluginsDir),
     }
     if (kind === 'desktop' && inserted && desktop === null) {
       desktop = item
@@ -226,6 +247,30 @@ export function setOverlayRailPluginInserted(
     return setDesktopOccupantExclusive(patchText, pluginsDir, id)
   }
   return setLoaderRowInserted(patchText, id, inserted)
+}
+
+/**
+ * Hide or show one `overlay-shaped.body` occupant. The silhouette stays
+ * mounted. The shaped host Loader row and other fibers have no hide file.
+ * @param pluginsDir - profile `plugins/` directory.
+ * @param id - occupant Loader id.
+ * @param hidden - `true` hides the silhouette with CSS visibility; the occupant stays mounted.
+ * @throws when the id is not a shaped occupant.
+ */
+export function setOverlayRailPluginHidden(
+  pluginsDir: string,
+  id: string,
+  hidden: boolean,
+): void {
+  if (overlayRailKind(id, pluginsDir) !== 'shaped') {
+    throw new Error(`overlay-plugins: ${JSON.stringify(id)} is not a shaped occupant`)
+  }
+  const hostDir = findShapedHostPluginDir(pluginsDir)
+  if (hostDir === undefined) {
+    throw new Error('overlay-plugins: overlay shaped plugin is not loaded')
+  }
+  const next = setShapedHiddenId(readShapedHiddenIds(pluginsDir), id, hidden)
+  writeFileSync(join(hostDir, OVERLAY_SHAPED_HIDDEN_FILE), formatShapedHiddenFile(next))
 }
 
 /**
@@ -307,6 +352,18 @@ function dispatchOverlayPluginRpc(
     }
     return { ok: true, value: listedFromDisk(patchPath, pluginsDir) }
   }
+  if (endpoint === OVERLAY_PLUGIN_SET_HIDDEN_ENDPOINT) {
+    const request = parseSetHiddenPayload(payload)
+    if (request === undefined) {
+      return badRequest('overlay-plugins: plugins.setHidden needs { id, hidden }')
+    }
+    try {
+      setOverlayRailPluginHidden(pluginsDir, request.id, request.hidden)
+    } catch (error) {
+      return badRequest(error instanceof Error ? error.message : 'overlay-plugins: setHidden failed')
+    }
+    return { ok: true, value: listedFromDisk(patchPath, pluginsDir) }
+  }
   if (endpoint === OVERLAY_PLUGIN_SWITCH_DESKTOP_ENDPOINT) {
     const request = parseSwitchDesktopPayload(payload)
     if (request === undefined) {
@@ -337,12 +394,77 @@ function overlayRailKind(id: string, pluginsDir: string): OverlayRailKind | unde
   const pkg = readPluginPackage(pluginsDir, id)
   if (pkg === undefined) return undefined
   if (typeof pkg.name === 'string' && pkg.name === OVERLAY_DESKTOP_PACKAGE_NAME) return undefined
+  if (typeof pkg.name === 'string' && pkg.name === OVERLAY_SHAPED_PACKAGE_NAME) return undefined
   const client = dshClientRecord(pkg)
   if (client === undefined) return undefined
   if (typeof client.overlayBody === 'string') {
-    return client.overlayBody === OVERLAY_DESKTOP_BODY_SLOT ? 'desktop' : undefined
+    if (client.overlayBody === OVERLAY_DESKTOP_BODY_SLOT) return 'desktop'
+    if (client.overlayBody === OVERLAY_SHAPED_BODY_SLOT) return 'shaped'
+    return undefined
   }
   return 'fiber'
+}
+
+function standalonePluginModuleName(id: string, pluginsDir: string): string {
+  const pkg = readPluginPackage(pluginsDir, id)
+  return typeof pkg?.name === 'string' ? pkg.name : ''
+}
+
+function findShapedHostPluginDir(pluginsDir: string): string | undefined {
+  let names: string[]
+  try {
+    names = readdirSync(pluginsDir)
+  } catch (error) {
+    if (isMissingFile(error)) return undefined
+    throw error
+  }
+  for (const name of names) {
+    const root = join(pluginsDir, name)
+    const pkg = readPluginPackage(pluginsDir, name)
+    if (pkg?.name === OVERLAY_SHAPED_PACKAGE_NAME) return root
+  }
+  return undefined
+}
+
+function readShapedHiddenIds(pluginsDir: string): readonly string[] {
+  const hostDir = findShapedHostPluginDir(pluginsDir)
+  if (hostDir === undefined) return []
+  try {
+    return parseShapedHiddenFile(readFileSync(join(hostDir, OVERLAY_SHAPED_HIDDEN_FILE), 'utf8'))
+  } catch (error) {
+    if (isMissingFile(error)) return []
+    throw error
+  }
+}
+
+function parseShapedHiddenFile(text: string): readonly string[] {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text) as unknown
+  } catch {
+    return []
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return []
+  const hidden = (parsed as { hidden?: unknown }).hidden
+  if (!Array.isArray(hidden)) return []
+  const ids: string[] = []
+  const seen = new Set<string>()
+  for (const id of hidden) {
+    if (typeof id !== 'string' || id.length === 0 || seen.has(id)) continue
+    seen.add(id)
+    ids.push(id)
+  }
+  return ids
+}
+
+function formatShapedHiddenFile(ids: readonly string[]): string {
+  return `${JSON.stringify({ hidden: [...ids] }, null, 2)}\n`
+}
+
+function setShapedHiddenId(ids: readonly string[], id: string, hidden: boolean): readonly string[] {
+  const next = ids.filter(item => item !== id)
+  if (hidden) return [...next, id]
+  return next
 }
 
 function standalonePluginTitle(id: string, pluginsDir: string): string {
@@ -459,6 +581,14 @@ function yamlScalar(raw: string): string {
     }
   }
   return text
+}
+
+function parseSetHiddenPayload(value: unknown): { id: string; hidden: boolean } | undefined {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const record = value as Record<string, unknown>
+  if (typeof record.id !== 'string' || record.id.length === 0) return undefined
+  if (typeof record.hidden !== 'boolean') return undefined
+  return { id: record.id, hidden: record.hidden }
 }
 
 function parseSetInsertedPayload(value: unknown): { id: string; inserted: boolean } | undefined {

@@ -27,12 +27,10 @@ dsh web GUI 的浏览器侧：shell 启动、浏览器与宿主通信、共享 U
 | [`ui-conversation/`](ui-conversation/README.md) | 展示当前对话及其输入界面。 |
 | [`ui-cursor-agent/`](ui-cursor-agent/README.md) | 在 DSH 对话栏上方浮起官方 Cursor CLI TUI。 |
 | [`ui-float-window/`](ui-float-window/README.md) | 规范的可复用 overlay 卡片桌面，占据 `shell.overlay`；插入本包并传入 `--title` / `--card-id` / `--width` / `--height`（再次插入会再加一张卡片），再占据 `overlay-card.body`。 |
-| [`ui-dew-journal/`](ui-dew-journal/README.md) | `overlay-card.body` 的占用者。默认 web-app 名录不挂载。 |
 | [`ui-overlay-desktop/`](ui-overlay-desktop/README.md) | 规范的可复用 overlay 桌面基模，占据 `shell.overlay`；插入本包后再占据 `overlay-desktop.body`（同时只能一个占用者）。 |
-| [`ui-dopamine-desk/`](ui-dopamine-desk/README.md) | `overlay-desktop.body` 的占用者。默认 web-app 名录不挂载。 |
-| [`ui-black-hole/`](ui-black-hole/README.md) | `overlay-desktop.body` 的占用者。默认 web-app 名录不挂载。 |
-| [`ui-koi-pond/`](ui-koi-pond/README.md) | `overlay-desktop.body` 的占用者。默认 web-app 名录不挂载。 |
-| [`ui-office-desk/`](ui-office-desk/README.md) | `overlay-desktop.body` 的占用者。默认 web-app 名录不挂载。 |
+| [`ui-overlay-shaped/`](ui-overlay-shaped/README.md) | 规范的可复用 overlay 异形基模，占据 `shell.overlay`；插入本包后再占据 `overlay-shaped.body`（可同时多个占用者）。 |
+| [`ui-flower-pot/`](ui-flower-pot/README.md) | `overlay-shaped.body` 的占用者。默认 web-app 名录不挂载。 |
+| [`ui-television/`](ui-television/README.md) | `shell.overlay` 上的独立 CRT 电视 fiber。默认 web-app 名录不挂载。 |
 | [`ui-tool/`](ui-tool/README.md) | 编排工具调用树和按工具键控的视图。 |
 | [`ui-workflow-run/`](ui-workflow-run/README.md) | 把持久工作流运行回放为 Chat 嵌套折叠项，并只为实时子 Session 提供导航。 |
 | [`ui-goal/`](ui-goal/README.md) | 展示和管理当前目标。 |

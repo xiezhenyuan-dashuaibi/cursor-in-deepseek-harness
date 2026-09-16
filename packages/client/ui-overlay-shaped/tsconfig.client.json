@@ -1,0 +1,37 @@
+{
+  "extends": "../../../tsconfig.base.client.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.client.tsbuildinfo"
+  },
+  "files": [
+    "src/css-modules.d.ts",
+    "src/shaped.ts",
+    "src/client/contract/slots.ts",
+    "src/client/geometry.ts",
+    "src/client/offset-storage.ts",
+    "src/client/body-ids.ts",
+    "src/client/hidden-registrants.ts",
+    "src/client/ShapedSeat.tsx",
+    "src/client/ShapedBoard.tsx",
+    "src/client/index.ts"
+  ],
+  "references": [
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../runtime"
+    },
+    {
+      "path": "../ui-layout"
+    },
+    {
+      "path": "../ui-slots"
+    },
+    {
+      "path": "../../runtime-diagnostics/invariants"
+    }
+  ]
+}

@@ -1,0 +1,172 @@
+/** Celadon pot with a morning-glory vine on overlay-shaped.body. */
+
+.anchor {
+  --pot: #7ea08a;
+  --pot-dark: #3e5c4b;
+  --pot-light: #c5d9cc;
+  --soil-dry: #7a5c48;
+  --soil-wet: #3b2a22;
+  --leaf: #2a6b38;
+  --leaf-wilt: #8a7438;
+  --bloom: #6a48a8;
+  --bloom-lip: #d9b4e8;
+  --stake: #c4a15a;
+  --drip: #7eb6e8;
+  --gap: 8px;
+  --action-radius: 8px;
+  --action-pad: 12px;
+  position: absolute;
+  left: 4%;
+  bottom: 5%;
+  width: 14rem;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.silhouette {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gap);
+}
+
+.art {
+  display: block;
+  width: 14rem;
+  height: 20rem;
+  overflow: visible;
+}
+
+.pot {
+  fill: var(--pot);
+}
+
+.potLip {
+  fill: var(--pot-light);
+}
+
+.potShadow {
+  fill: var(--pot-dark);
+  opacity: 0.35;
+}
+
+.saucer {
+  fill: var(--pot-dark);
+}
+
+.soil {
+  fill: var(--soil-dry);
+  transition: fill var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+.soil[data-wet='true'] {
+  fill: var(--soil-wet);
+}
+
+.stake {
+  stroke: var(--stake);
+  stroke-width: 6;
+  stroke-linecap: round;
+  fill: none;
+}
+
+.vine,
+.leaf {
+  fill: var(--leaf);
+  stroke: var(--leaf);
+}
+
+.wilt .vine,
+.wilt .leaf {
+  fill: var(--leaf-wilt);
+  stroke: var(--leaf-wilt);
+}
+
+.bloom {
+  fill: var(--bloom);
+}
+
+.bloomThroat {
+  fill: var(--bloom-lip);
+}
+
+.drip {
+  fill: var(--drip);
+  opacity: 0;
+}
+
+.watering .drip {
+  animation: drip 0.7s var(--ds-ease-in-out);
+}
+
+.crumb {
+  fill: var(--stake);
+  opacity: 0;
+}
+
+.feeding .crumb {
+  animation: crumb 0.8s var(--ds-ease-in-out);
+}
+
+.actions {
+  display: flex;
+  gap: var(--gap);
+}
+
+.action {
+  min-inline-size: 4.5rem;
+  min-block-size: 2rem;
+  padding: 0 var(--action-pad);
+  border: 0;
+  border-radius: var(--action-radius);
+  background: var(--pot-dark);
+  color: var(--pot-light);
+  font: var(--dsw-font-xxs-strong-12);
+  cursor: pointer;
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 2px;
+}
+
+.status {
+  margin: 0;
+  max-width: 14rem;
+  color: var(--dsw-alias-brand-text);
+  font: var(--dsw-font-xxs-12);
+  text-align: center;
+  text-shadow: 0 1px 2px var(--dsw-alias-bg-mask-1);
+}
+
+@keyframes drip {
+  0% {
+    opacity: 0.9;
+    transform: translateY(-8px);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+
+@keyframes crumb {
+  0% {
+    opacity: 0.9;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .watering .drip,
+  .feeding .crumb,
+  .soil {
+    animation: none;
+    transition: none;
+  }
+}

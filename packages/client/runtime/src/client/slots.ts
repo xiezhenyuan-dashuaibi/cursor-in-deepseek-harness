@@ -9,11 +9,6 @@
  * key -> create/cache, dropped with the last holding entry, session instances
  * cleared (with persisted state) on scope death.
  */
-/* oxlint-disable typescript/no-redundant-type-constituents --
- * `keyof SlotMap & string` is the declare-merge key pattern: SlotMap only
- * holds this package's 'root' row in this compilation unit, but consumers
- * merge keys in; the rule fires on the narrow-map view, not on real
- * redundancy. */
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import { SlotCore } from '@deepseek-ai/dsh-client-ui-slots'
@@ -86,6 +81,32 @@ interface ErasedRegisterOptions {
 /** Erased core call face (the service re-erases at its own boundary; the core's typed face targets end callers). */
 interface ErasedCore { register(options: object, component: unknown): () => void }
 
+/**
+ * Caller identity for slot diagnostics and overlay shaped hide join.
+ * Loader-backed client plugins rarely export `name`, so `fiber.name` is
+ * `'root'`; the entry specifier is the npm package name roster `moduleName`.
+ */
+type FiberRegistrantStamp = {
+  name?: string
+  entry?: { options?: { name?: string } }
+}
+
+/**
+ * Stamp written onto `StoredEntry.registrant`.
+ * @param options - register options; an explicit `registrant` wins.
+ * @param fiber - caller's fiber (Loader entry when present).
+ * @returns npm package name, plugin `name`, or `undefined`.
+ */
+function slotRegistrantStamp(
+  options: { registrant?: string },
+  fiber: FiberRegistrantStamp | undefined,
+): string | undefined {
+  if (options.registrant !== undefined) return options.registrant
+  const entryName = fiber?.entry?.options?.name
+  if (typeof entryName === 'string' && entryName.length > 0) return entryName
+  return fiber?.name
+}
+
 /** One synchronous effect installed while an injected slot declaration is live. */
 type SlotInjectionEffect = (() => void) | Iterable<() => void, void, void>
 
@@ -113,8 +134,9 @@ export class SlotRegistry extends Service {
    * face, load-time validation, and the unload cascade). This layer adds:
    * disposal through the caller's ctx.effect (fiber unload = cascade),
    * exclusive-factory minting (`store: createXxxStore` becomes a per-entry
-   * handle), the registrant diagnostics stamp, and store-instance lifecycle
-   * on the entry axis.
+   * handle), the registrant stamp (explicit `registrant`, else Loader entry
+   * npm name, else `fiber.name`), and store-instance lifecycle on the entry
+   * axis.
    *
    * Declared here, implemented by prototype assignment below the class: it
    * MUST stay a prototype method (never an instance arrow) — the cordis
@@ -358,7 +380,7 @@ export class SlotRegistry extends Service {
     // handle so the stored entry always carries a resolvable handle (the
     // core's shared-handle scope pinning applies to it harmlessly).
     const store = typeof options.store === 'function' ? options.store() : options.store
-    const registrant = options.registrant ?? (this.ctx.fiber as { name?: string } | undefined)?.name
+    const registrant = slotRegistrantStamp(options, this.ctx.fiber as FiberRegistrantStamp | undefined)
     const erased: ErasedRegisterOptions = {
       ...options,
       ...(store !== undefined ? { store } : {}),
@@ -466,6 +488,5 @@ export class SlotRegistry extends Service {
     // The core's overloads proved the shares; the implementation works on
     // the erased view (same pattern as the core's own implementation arm).
     const options = rawOptions as ErasedRegisterOptions
-    // oxlint-disable-next-line typescript/no-misused-promises -- synchronous cleanup; direct return preserves disposer identity
     return this.ctx.effect(() => this['_register'](options, component), 'slots.register()')
   }

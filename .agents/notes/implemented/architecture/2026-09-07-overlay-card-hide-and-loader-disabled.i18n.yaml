@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-07-overlay-card-hide-and-loader-disabled.md
-2026-09-07-overlay-card-hide-and-loader-disabled.md: c910ed6a98da191bab76cbf6dee1c3f2b23e1423
-2026-09-07-overlay-card-hide-and-loader-disabled.zh.md: 61f2d497a794eecf8814bf525afa533bfb621f08
+2026-09-07-overlay-card-hide-and-loader-disabled.md: 20e6149f4b57111a5efccec81403d48c334ef124
+2026-09-07-overlay-card-hide-and-loader-disabled.zh.md: 5109d9ff9dfe673336d6b48ecf0c537bd91c4c0e
