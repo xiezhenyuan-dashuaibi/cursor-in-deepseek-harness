@@ -49,7 +49,7 @@ describe('ui-overlay-shaped browser apply', () => {
       () => null,
     )
     ctx.slots.register(
-      { name: 'overlay-shaped.body', id: 'television', registrant: '@deepseek-ai/dsh-client-ui-television' },
+      { name: 'overlay-shaped.body', id: 'seat-b', registrant: '@deepseek-ai/dsh-client-ui-seat-b' },
       () => null,
     )
     expect(ctx.slots.entries('overlay-shaped.body')).toHaveLength(2)
@@ -63,7 +63,7 @@ describe('ui-overlay-shaped browser apply', () => {
     }).inject?.()
     expect(injected?.hooks.bodyIds.getSnapshot()).toEqual([
       { id: 'sprite', registrant: '@deepseek-ai/dsh-client-ui-sprite' },
-      { id: 'television', registrant: '@deepseek-ai/dsh-client-ui-television' },
+      { id: 'seat-b', registrant: '@deepseek-ai/dsh-client-ui-seat-b' },
     ])
     expect(injected?.hooks.hiddenRegistrants.getSnapshot()).toEqual([])
     await fiber.dispose()

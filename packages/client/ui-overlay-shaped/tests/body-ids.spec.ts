@@ -39,13 +39,13 @@ describe('createBodyIdsSource', () => {
     const { source } = ledger([
       undefined,
       { id: '' },
-      { id: 'flower-pot', registrant: '@deepseek-ai/dsh-client-ui-flower-pot' },
+      { id: 'seat-a', registrant: '@deepseek-ai/dsh-client-ui-seat-a' },
       { id: 'notes' },
     ])
     const ids = createBodyIdsSource(source)
     const first = ids.getSnapshot()
     expect(first).toEqual([
-      { id: 'flower-pot', registrant: '@deepseek-ai/dsh-client-ui-flower-pot' },
+      { id: 'seat-a', registrant: '@deepseek-ai/dsh-client-ui-seat-a' },
       { id: 'notes', registrant: '' },
     ])
     expect(ids.getSnapshot()).toBe(first)

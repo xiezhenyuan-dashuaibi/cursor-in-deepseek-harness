@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-14-overlay-shaped-host.md
-2026-09-14-overlay-shaped-host.md: fba745fa99acfc441f65a13db13d2061d14585cc
-2026-09-14-overlay-shaped-host.zh.md: 22754e76afbcc4aafa5f80bec356cf80433432f7
+2026-09-14-overlay-shaped-host.md: 016837eec5d07160eea0712758a84dba4b63de43
+2026-09-14-overlay-shaped-host.zh.md: 9deab858753515caef50735f0a4440234faa0793

@@ -36,7 +36,7 @@ profile 副本的现场插入仍使用 `pnpm overlay:live`（[现场路径](../a
 
 ## Consequences
 
-卡片窗口工作走 `dsh-overlay-web-plugins`。桌面工作走 `dsh-overlay-canvas-plugins`。任意形状悬件工作走 `dsh-overlay-shaped-plugins`：插入 [`ui-overlay-shaped`](../../../../packages/client/ui-overlay-shaped/README.md)，运行 `pnpm overlay:new-shaped`，占据 `overlay-shaped.body`（[异形宿主](../architecture/2026-09-14-overlay-shaped-host.md)，[overlay 异形占用者生成](2026-09-14-overlay-new-shaped.md)）。对该名字调用 `dsh_skill` 就会加载快速开发 HOW（占用者 `onClick`、推迟的宿主 Pointer Capture、画出来的内尺寸）。checkout 包可以不写 `overlayBody`、以独立 fiber 占据 `shell.overlay`；[`ui-television`](../../../../packages/client/ui-television/README.md) 是那条 fiber（[独立 fiber](../architecture/2026-09-14-overlay-television-standalone-fiber.md)）。那个包不是可复用宿主，也不是生成器占位。新的形状不复制那种占用。现场与启动、第一次导入缓存、禁止重启仍由[现场路径](../architecture/2026-09-04-overlay-web-plugin-live-path.md)笔记拥有。
+卡片窗口工作走 `dsh-overlay-web-plugins`。桌面工作走 `dsh-overlay-canvas-plugins`。任意形状悬件工作走 `dsh-overlay-shaped-plugins`：插入 [`ui-overlay-shaped`](../../../../packages/client/ui-overlay-shaped/README.md)，运行 `pnpm overlay:new-shaped`，占据 `overlay-shaped.body`（[异形宿主](../architecture/2026-09-14-overlay-shaped-host.md)，[overlay 异形占用者生成](2026-09-14-overlay-new-shaped.md)）。对该名字调用 `dsh_skill` 就会加载快速开发 HOW（占用者 `onClick`、推迟的宿主 Pointer Capture、画出来的内尺寸）。checkout 包可以不写 `overlayBody`、以独立 fiber 占据 `shell.overlay`（[独立 fiber](../architecture/2026-09-14-overlay-television-standalone-fiber.md)）。那种占用不是可复用宿主，也不是生成器占位。新的形状不复制那种占用。现场与启动、第一次导入缓存、禁止重启仍由[现场路径](../architecture/2026-09-04-overlay-web-plugin-live-path.md)笔记拥有。
 
 ## Testing
 

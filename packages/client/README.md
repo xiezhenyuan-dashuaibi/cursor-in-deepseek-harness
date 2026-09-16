@@ -29,8 +29,6 @@ This table is the client plugin inventory. Each package README owns that plugin'
 | [`ui-float-window/`](ui-float-window/README.md) | Canonical reusable overlay card desk on `shell.overlay`; insert this package with `--title` / `--card-id` / `--width` / `--height` (repeat insert adds another card), then occupy `overlay-card.body`. |
 | [`ui-overlay-desktop/`](ui-overlay-desktop/README.md) | Canonical reusable overlay desktop board on `shell.overlay`; insert this package, then occupy `overlay-desktop.body` (one occupant at a time). |
 | [`ui-overlay-shaped/`](ui-overlay-shaped/README.md) | Canonical reusable overlay shaped board on `shell.overlay`; insert this package, then occupy `overlay-shaped.body` (many occupants at once). |
-| [`ui-flower-pot/`](ui-flower-pot/README.md) | Occupant of `overlay-shaped.body`. Not in the default web-app roster. |
-| [`ui-television/`](ui-television/README.md) | Standalone CRT television fiber on `shell.overlay`. Not in the default web-app roster. |
 | [`ui-tool/`](ui-tool/README.md) | Composes Tool call trees and keyed per-Tool views. |
 | [`ui-workflow-run/`](ui-workflow-run/README.md) | Replays durable workflow runs as nested Chat disclosures with live-only child navigation. |
 | [`ui-goal/`](ui-goal/README.md) | Presents and manages the current goal. |

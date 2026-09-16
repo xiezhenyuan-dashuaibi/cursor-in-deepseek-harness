@@ -35,7 +35,7 @@ afterEach(() => {
 const CANVAS: ShapedCanvasSize = { width: 800, height: 600 }
 const REST = { x: 40, y: 50, width: 120, height: 80 }
 
-function seat(id = 'flower-pot', onRaise = vi.fn(), canvas = CANVAS) {
+function seat(id = 'seat-a', onRaise = vi.fn(), canvas = CANVAS) {
   const view = render(
     <div data-overlay-shaped="">
       <ShapedSeat id={id} canvas={canvas} zIndex={3} onRaise={onRaise}>
@@ -55,12 +55,12 @@ function seat(id = 'flower-pot', onRaise = vi.fn(), canvas = CANVAS) {
 
 describe('ShapedSeat', () => {
   it('hydrates a stored offset and raises on primary pointer down', () => {
-    writeShapedOffset('flower-pot', { x: 5, y: 7 })
+    writeShapedOffset('seat-a', { x: 5, y: 7 })
     const { el, onRaise } = seat()
     expect(el.style.transform).toBe('translate(5px, 7px)')
     expect(el.style.zIndex).toBe('3')
     fireEvent.pointerDown(el, { button: 0, pointerId: 1, clientX: 10, clientY: 10 })
-    expect(onRaise).toHaveBeenCalledWith('flower-pot')
+    expect(onRaise).toHaveBeenCalledWith('seat-a')
     expect(el.setPointerCapture).not.toHaveBeenCalled()
   })
 
@@ -80,7 +80,7 @@ describe('ShapedSeat', () => {
     expect(el.setPointerCapture).not.toHaveBeenCalled()
     fireEvent.pointerUp(el, { pointerId: 1, clientX: SHAPED_CLICK_SLOP, clientY: 0 })
     expect(el.releasePointerCapture).not.toHaveBeenCalled()
-    expect(readShapedOffset('flower-pot')).toEqual({ x: 0, y: 0 })
+    expect(readShapedOffset('seat-a')).toEqual({ x: 0, y: 0 })
   })
 
   it('captures the pointer only after travel leaves the click slop', () => {
@@ -100,12 +100,12 @@ describe('ShapedSeat', () => {
     const onPick = vi.fn()
     const view = render(
       <div data-overlay-shaped="">
-        <ShapedSeat id="flower-pot" canvas={CANVAS} zIndex={3} onRaise={vi.fn()}>
+        <ShapedSeat id="seat-a" canvas={CANVAS} zIndex={3} onRaise={vi.fn()}>
           <button type="button" onClick={onPick}>hit</button>
         </ShapedSeat>
       </div>,
     )
-    const el = view.container.querySelector('[data-overlay-shaped-seat="flower-pot"]') as HTMLElement
+    const el = view.container.querySelector('[data-overlay-shaped-seat="seat-a"]') as HTMLElement
     const hit = el.querySelector('button') as HTMLElement
     el.setPointerCapture = vi.fn()
     el.releasePointerCapture = vi.fn()
@@ -120,13 +120,13 @@ describe('ShapedSeat', () => {
     const onPick = vi.fn()
     const view = render(
       <div data-overlay-shaped="">
-        <ShapedSeat id="flower-pot" canvas={CANVAS} zIndex={3} onRaise={vi.fn()}>
+        <ShapedSeat id="seat-a" canvas={CANVAS} zIndex={3} onRaise={vi.fn()}>
           <button type="button" onClick={onPick}>hit</button>
         </ShapedSeat>
       </div>,
     )
     const board = view.container.querySelector('[data-overlay-shaped]') as HTMLElement
-    const el = view.container.querySelector('[data-overlay-shaped-seat="flower-pot"]') as HTMLElement
+    const el = view.container.querySelector('[data-overlay-shaped-seat="seat-a"]') as HTMLElement
     const hit = el.querySelector('button') as HTMLElement
     el.setPointerCapture = vi.fn()
     el.releasePointerCapture = vi.fn()
@@ -147,7 +147,7 @@ describe('ShapedSeat', () => {
     fireEvent.pointerMove(el, { pointerId: 1, clientX: 20, clientY: 10 })
     expect(el.style.transform).toBe('translate(20px, 10px)')
     fireEvent.pointerUp(el, { pointerId: 1, clientX: 20, clientY: 10 })
-    expect(readShapedOffset('flower-pot')).toEqual({ x: 20, y: 10 })
+    expect(readShapedOffset('seat-a')).toEqual({ x: 20, y: 10 })
     expect(el.releasePointerCapture).toHaveBeenCalledWith(1)
   })
 
@@ -156,7 +156,7 @@ describe('ShapedSeat', () => {
     fireEvent.pointerMove(el, { pointerId: 1, clientX: 40, clientY: 40 })
     expect(el.style.transform).toBe('translate(0px, 0px)')
     fireEvent.pointerUp(el, { pointerId: 1, clientX: 40, clientY: 40 })
-    expect(readShapedOffset('flower-pot')).toEqual({ x: 0, y: 0 })
+    expect(readShapedOffset('seat-a')).toEqual({ x: 0, y: 0 })
   })
 
   it('ignores a move from another pointer and still persists on cancel', () => {
@@ -167,7 +167,7 @@ describe('ShapedSeat', () => {
     fireEvent.pointerUp(el, { pointerId: 8, clientX: 40, clientY: 40 })
     fireEvent.pointerMove(el, { pointerId: 7, clientX: 15, clientY: 0 })
     fireEvent.pointerCancel(el, { pointerId: 7, clientX: 15, clientY: 0 })
-    expect(readShapedOffset('flower-pot')).toEqual({ x: 15, y: 0 })
+    expect(readShapedOffset('seat-a')).toEqual({ x: 15, y: 0 })
   })
 
   it('starts a drag when setPointerCapture throws', () => {
@@ -188,19 +188,19 @@ describe('ShapedSeat', () => {
     fireEvent.pointerDown(el, { button: 0, pointerId: 1, clientX: 0, clientY: 0 })
     fireEvent.pointerMove(el, { pointerId: 1, clientX: 20, clientY: 0 })
     fireEvent.pointerUp(el, { pointerId: 1, clientX: 20, clientY: 0 })
-    expect(readShapedOffset('flower-pot')).toEqual({ x: 20, y: 0 })
+    expect(readShapedOffset('seat-a')).toEqual({ x: 20, y: 0 })
   })
 
   it('keeps children mounted when hidden and skips drag', () => {
     const onRaise = vi.fn()
     const view = render(
       <div data-overlay-shaped="">
-        <ShapedSeat id="flower-pot" canvas={CANVAS} zIndex={3} onRaise={onRaise} hidden>
+        <ShapedSeat id="seat-a" canvas={CANVAS} zIndex={3} onRaise={onRaise} hidden>
           <button type="button">hit</button>
         </ShapedSeat>
       </div>,
     )
-    const el = view.container.querySelector('[data-overlay-shaped-seat="flower-pot"]') as HTMLElement
+    const el = view.container.querySelector('[data-overlay-shaped-seat="seat-a"]') as HTMLElement
     expect(el.hasAttribute('data-overlay-shaped-hidden')).toBe(true)
     expect(el.querySelector('button')?.textContent).toBe('hit')
     fireEvent.pointerDown(el, { button: 0, pointerId: 1, clientX: 0, clientY: 0 })
@@ -216,33 +216,33 @@ describe('ShapedSeat', () => {
     expect(el.style.transform).toBe('translate(-40px, -50px)')
     fireEvent.pointerUp(el, { pointerId: 1, clientX: 5000, clientY: 4000 })
     expect(el.style.transform).toBe('translate(640px, 470px)')
-    expect(readShapedOffset('flower-pot')).toEqual({ x: 640, y: 470 })
+    expect(readShapedOffset('seat-a')).toEqual({ x: 640, y: 470 })
   })
 
   it('reclamps a stored offset when the playable board shrinks', () => {
     const REST = { x: 40, y: 50, width: 120, height: 80 }
-    writeShapedOffset('flower-pot', { x: 640, y: 470 })
+    writeShapedOffset('seat-a', { x: 640, y: 470 })
     const view = render(
       <div data-overlay-shaped="">
-        <ShapedSeat id="flower-pot" canvas={CANVAS} zIndex={3} onRaise={vi.fn()}>
+        <ShapedSeat id="seat-a" canvas={CANVAS} zIndex={3} onRaise={vi.fn()}>
           <button type="button">hit</button>
         </ShapedSeat>
       </div>,
     )
     const board = view.container.querySelector('[data-overlay-shaped]') as HTMLElement
-    const el = view.container.querySelector('[data-overlay-shaped-seat="flower-pot"]') as HTMLElement
+    const el = view.container.querySelector('[data-overlay-shaped-seat="seat-a"]') as HTMLElement
     const hit = el.querySelector('button') as HTMLElement
     stubBox(board, { left: 0, top: 0, width: CANVAS.width, height: CANVAS.height })
     stubMovingBox(hit, el, REST)
     view.rerender(
       <div data-overlay-shaped="">
-        <ShapedSeat id="flower-pot" canvas={{ width: 200, height: 150 }} zIndex={3} onRaise={vi.fn()}>
+        <ShapedSeat id="seat-a" canvas={{ width: 200, height: 150 }} zIndex={3} onRaise={vi.fn()}>
           <button type="button">hit</button>
         </ShapedSeat>
       </div>,
     )
     expect(el.style.transform).toBe('translate(40px, 20px)')
-    expect(readShapedOffset('flower-pot')).toEqual({ x: 40, y: 20 })
+    expect(readShapedOffset('seat-a')).toEqual({ x: 40, y: 20 })
   })
 
   it('skips a content resize reclamp while a pointer is down', () => {
@@ -250,7 +250,7 @@ describe('ShapedSeat', () => {
     fireEvent.pointerDown(el, { button: 0, pointerId: 1, clientX: 0, clientY: 0 })
     for (const fire of resizeFires) fire()
     expect(el.style.transform).toBe('translate(0px, 0px)')
-    expect(readShapedOffset('flower-pot')).toEqual({ x: 0, y: 0 })
+    expect(readShapedOffset('seat-a')).toEqual({ x: 0, y: 0 })
   })
 
   it('disconnects the occupant ResizeObserver on unmount', () => {
@@ -262,12 +262,12 @@ describe('ShapedSeat', () => {
   it('skips clamp when the occupant paints no element', () => {
     const view = render(
       <div data-overlay-shaped="">
-        <ShapedSeat id="flower-pot" canvas={CANVAS} zIndex={3} onRaise={vi.fn()}>
+        <ShapedSeat id="seat-a" canvas={CANVAS} zIndex={3} onRaise={vi.fn()}>
           {null}
         </ShapedSeat>
       </div>,
     )
-    const el = view.container.querySelector('[data-overlay-shaped-seat="flower-pot"]') as HTMLElement
+    const el = view.container.querySelector('[data-overlay-shaped-seat="seat-a"]') as HTMLElement
     el.setPointerCapture = vi.fn()
     el.releasePointerCapture = vi.fn()
     fireEvent.pointerDown(el, { button: 0, pointerId: 1, clientX: 0, clientY: 0 })
@@ -278,7 +278,7 @@ describe('ShapedSeat', () => {
   it('clamps using the occupant box inside a display:contents slot anchor', () => {
     const view = render(
       <div data-overlay-shaped="">
-        <ShapedSeat id="flower-pot" canvas={CANVAS} zIndex={3} onRaise={vi.fn()}>
+        <ShapedSeat id="seat-a" canvas={CANVAS} zIndex={3} onRaise={vi.fn()}>
           <div data-slot="overlay-shaped.body" style={{ display: 'contents' }}>
             <button type="button">hit</button>
           </div>
@@ -286,7 +286,7 @@ describe('ShapedSeat', () => {
       </div>,
     )
     const board = view.container.querySelector('[data-overlay-shaped]') as HTMLElement
-    const el = view.container.querySelector('[data-overlay-shaped-seat="flower-pot"]') as HTMLElement
+    const el = view.container.querySelector('[data-overlay-shaped-seat="seat-a"]') as HTMLElement
     const wrap = el.querySelector('[data-slot]') as HTMLElement
     const hit = el.querySelector('button') as HTMLElement
     el.setPointerCapture = vi.fn()
@@ -302,7 +302,7 @@ describe('ShapedSeat', () => {
   it('walks into a zero-size wrapper that still has occupant children', () => {
     const view = render(
       <div data-overlay-shaped="">
-        <ShapedSeat id="flower-pot" canvas={CANVAS} zIndex={3} onRaise={vi.fn()}>
+        <ShapedSeat id="seat-a" canvas={CANVAS} zIndex={3} onRaise={vi.fn()}>
           <div>
             <button type="button">hit</button>
           </div>
@@ -310,7 +310,7 @@ describe('ShapedSeat', () => {
       </div>,
     )
     const board = view.container.querySelector('[data-overlay-shaped]') as HTMLElement
-    const el = view.container.querySelector('[data-overlay-shaped-seat="flower-pot"]') as HTMLElement
+    const el = view.container.querySelector('[data-overlay-shaped-seat="seat-a"]') as HTMLElement
     const wrap = el.firstElementChild as HTMLElement
     const hit = el.querySelector('button') as HTMLElement
     el.setPointerCapture = vi.fn()

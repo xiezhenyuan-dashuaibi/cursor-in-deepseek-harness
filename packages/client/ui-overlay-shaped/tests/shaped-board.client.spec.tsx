@@ -77,13 +77,13 @@ describe('ShapedBoard', () => {
     const view = render(
       <ShapedBoard
         renderSlot={renderSlot as ShapedBoardProps['renderSlot']}
-        useBodyIds={hook(['flower-pot', 'notes'])}
+        useBodyIds={hook(['seat-a', 'notes'])}
         useHiddenRegistrants={hiddenHook()}
       />,
     )
-    expect(renderSlot).toHaveBeenCalledWith('overlay-shaped.body', {}, { only: 'flower-pot' })
+    expect(renderSlot).toHaveBeenCalledWith('overlay-shaped.body', {}, { only: 'seat-a' })
     expect(renderSlot).toHaveBeenCalledWith('overlay-shaped.body', {}, { only: 'notes' })
-    const pot = view.container.querySelector('[data-overlay-shaped-seat="flower-pot"]') as HTMLElement
+    const pot = view.container.querySelector('[data-overlay-shaped-seat="seat-a"]') as HTMLElement
     const notes = view.container.querySelector('[data-overlay-shaped-seat="notes"]') as HTMLElement
     expect(pot.style.zIndex).toBe('1')
     expect(notes.style.zIndex).toBe('2')
@@ -100,11 +100,11 @@ describe('ShapedBoard', () => {
     const view = render(
       <ShapedBoard
         renderSlot={renderSlot as ShapedBoardProps['renderSlot']}
-        useBodyIds={hook(['flower-pot', 'notes'])}
+        useBodyIds={hook(['seat-a', 'notes'])}
         useHiddenRegistrants={hiddenHook()}
       />,
     )
-    const pot = view.container.querySelector('[data-overlay-shaped-seat="flower-pot"]') as HTMLElement
+    const pot = view.container.querySelector('[data-overlay-shaped-seat="seat-a"]') as HTMLElement
     fireEvent.pointerDown(pot, { button: 0, pointerId: 1, clientX: 0, clientY: 0 })
     view.rerender(
       <ShapedBoard
@@ -114,7 +114,7 @@ describe('ShapedBoard', () => {
       />,
     )
     const notes = view.container.querySelector('[data-overlay-shaped-seat="notes"]') as HTMLElement
-    expect(view.container.querySelector('[data-overlay-shaped-seat="flower-pot"]')).toBeNull()
+    expect(view.container.querySelector('[data-overlay-shaped-seat="seat-a"]')).toBeNull()
     expect(notes.style.zIndex).toBe('1')
     fireEvent.pointerDown(notes, { button: 0, pointerId: 2, clientX: 0, clientY: 0 })
     expect(notes.style.zIndex).toBe('1')
@@ -125,11 +125,11 @@ describe('ShapedBoard', () => {
     const view = render(
       <ShapedBoard
         renderSlot={renderSlot as ShapedBoardProps['renderSlot']}
-        useBodyIds={hook(['flower-pot', 'notes'])}
-        useHiddenRegistrants={hiddenHook(['@deepseek-ai/dsh-client-ui-flower-pot'])}
+        useBodyIds={hook(['seat-a', 'notes'])}
+        useHiddenRegistrants={hiddenHook(['@deepseek-ai/dsh-client-ui-seat-a'])}
       />,
     )
-    const pot = view.container.querySelector('[data-overlay-shaped-seat="flower-pot"]') as HTMLElement
+    const pot = view.container.querySelector('[data-overlay-shaped-seat="seat-a"]') as HTMLElement
     const notes = view.container.querySelector('[data-overlay-shaped-seat="notes"]') as HTMLElement
     expect(pot.hasAttribute('data-overlay-shaped-hidden')).toBe(true)
     expect(notes.hasAttribute('data-overlay-shaped-hidden')).toBe(false)

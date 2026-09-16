@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-14-overlay-television-standalone-fiber.md
-2026-09-14-overlay-television-standalone-fiber.md: 6f4108c865dd438b3fa16f11d60119be5cc6eba3
-2026-09-14-overlay-television-standalone-fiber.zh.md: f1406f5e59119b5d826d9e6e84e9c02b8895cbbf
+2026-09-14-overlay-television-standalone-fiber.md: 8442b2999d63a9684b49d27c40ffc89250894ce2
+2026-09-14-overlay-television-standalone-fiber.zh.md: a715f01b63e276a0f5277128a27aa508602a0bda

@@ -409,14 +409,14 @@ describe('declaration injection', () => {
       inject: ['slots'],
       apply: (ctx: Context) => {
         (ctx.fiber as { entry?: { options: { name: string } } }).entry = {
-          options: { name: '@deepseek-ai/dsh-client-ui-flower-pot' },
+          options: { name: '@deepseek-ai/dsh-client-ui-seat-a' },
         }
-        ctx.slots.register({ name: 't.rows', id: 'flower-pot' }, C)
+        ctx.slots.register({ name: 't.rows', id: 'seat-a' }, C)
       },
     })
     await occupant.await()
     expect(bench.svc.entries('t.rows')[0]?.registrant)
-      .toBe('@deepseek-ai/dsh-client-ui-flower-pot')
+      .toBe('@deepseek-ai/dsh-client-ui-seat-a')
   })
 
   it('keeps an explicit registrant over the Loader entry name', async () => {
@@ -429,10 +429,10 @@ describe('declaration injection', () => {
       inject: ['slots'],
       apply: (ctx: Context) => {
         (ctx.fiber as { entry?: { options: { name: string } } }).entry = {
-          options: { name: '@deepseek-ai/dsh-client-ui-flower-pot' },
+          options: { name: '@deepseek-ai/dsh-client-ui-seat-a' },
         }
         ctx.slots.register(
-          { name: 't.rows', id: 'flower-pot', registrant: 'explicit-id' },
+          { name: 't.rows', id: 'seat-a', registrant: 'explicit-id' },
           C,
         )
       },
@@ -453,7 +453,7 @@ describe('declaration injection', () => {
         (ctx.fiber as { entry?: { options: { name: string } } }).entry = {
           options: { name: '' },
         }
-        ctx.slots.register({ name: 't.rows', id: 'flower-pot' }, C)
+        ctx.slots.register({ name: 't.rows', id: 'seat-a' }, C)
       },
     })
     await occupant.await()

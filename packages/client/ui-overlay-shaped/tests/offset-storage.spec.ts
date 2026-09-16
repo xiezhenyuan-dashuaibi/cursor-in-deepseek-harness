@@ -12,15 +12,15 @@ afterEach(() => {
 
 describe('shaped offset storage', () => {
   it('returns the origin when nothing is stored', () => {
-    expect(readShapedOffset('flower-pot')).toEqual({ x: 0, y: 0 })
+    expect(readShapedOffset('seat-a')).toEqual({ x: 0, y: 0 })
   })
 
   it('round-trips a finite offset through localStorage', () => {
-    writeShapedOffset('flower-pot', { x: 12, y: -8 })
+    writeShapedOffset('seat-a', { x: 12, y: -8 })
     resetShapedOffsets()
-    expect(readShapedOffset('flower-pot')).toEqual({ x: 12, y: -8 })
+    expect(readShapedOffset('seat-a')).toEqual({ x: 12, y: -8 })
     expect(JSON.parse(window.localStorage.getItem(SHAPED_OFFSETS_STORAGE_KEY) ?? '')).toEqual({
-      'flower-pot': { x: 12, y: -8 },
+      'seat-a': { x: 12, y: -8 },
     })
   })
 

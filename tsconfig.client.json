@@ -69,8 +69,6 @@
     { "path": "./packages/client/ui-float-window/tsconfig.client.json" },
     { "path": "./packages/client/ui-overlay-desktop/tsconfig.client.json" },
     { "path": "./packages/client/ui-overlay-shaped/tsconfig.client.json" },
-    { "path": "./packages/client/ui-flower-pot" },
-    { "path": "./packages/client/ui-television" },
     { "path": "./packages/client/ui-tool" },
     { "path": "./packages/client/ui-deliverables" },
     { "path": "./packages/client/ui-workflow-run" },

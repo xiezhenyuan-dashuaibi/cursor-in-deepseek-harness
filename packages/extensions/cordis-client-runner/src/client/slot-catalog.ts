@@ -1179,9 +1179,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     hookContext: '',
     slotInject: '',
     declaredBy: 'an entry in \'shell.overlay\' (client-ui-overlay-shaped), so it exists while that entry is mounted',
-    occupants: [
-      'client-ui-flower-pot FlowerPot id \'flower-pot\'',
-    ],
+    occupants: [],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'overlay-shaped.body\', () => ctx.slots.register(\n      { name: \'overlay-shaped.body\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
     source: 'packages/client/ui-overlay-shaped/src/client/contract/slots.ts:17',
@@ -1210,7 +1208,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'root\', () => ctx.slots.register(\n      { name: \'root\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/runtime/src/client/slots.ts:41',
+    source: 'packages/client/runtime/src/client/slots.ts:36',
   },
   {
     key: 'settings.action',
@@ -1613,7 +1611,6 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       'client-ui-float-window OverlayDesk id \'overlay-card\'',
       'client-ui-overlay-desktop DesktopBoard id \'overlay-desktop\'',
       'client-ui-overlay-shaped ShapedBoard id \'overlay-shaped\'',
-      'client-ui-television Television',
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'shell.overlay\', () => ctx.slots.register(\n      { name: \'shell.overlay\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',

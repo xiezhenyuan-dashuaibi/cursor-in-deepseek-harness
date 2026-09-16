@@ -6,7 +6,7 @@ English | [中文](2026-09-14-overlay-shaped-host.zh.md)
 
 ## Problem
 
-The arbitrary-shape overlay form (skill id `dsh-overlay-shaped-plugins`) had no insertable host. Contributors either occupied `shell.overlay` with a product-owned chrome id, stuffed a non-card outline into `overlay-card.body`, or waited behind a reserved skill that said stop. The first product, [`ui-television`](../../../../packages/client/ui-television/README.md), is a standalone fiber ([standalone fiber](2026-09-14-overlay-television-standalone-fiber.md)). A second shape would have copied that occupancy instead of sharing a board. Occupying `root` would shadow AppFrame. Occupying `overlay-desktop.body` would exclusive-disable other desktops and paint a full-viewport page, not concurrent silhouettes.
+The arbitrary-shape overlay form (skill id `dsh-overlay-shaped-plugins`) had no insertable host. Contributors either occupied `shell.overlay` with a product-owned chrome id, stuffed a non-card outline into `overlay-card.body`, or waited behind a reserved skill that said stop. A checkout package may occupy `shell.overlay` as a standalone fiber ([standalone fiber](2026-09-14-overlay-television-standalone-fiber.md)). A second shape would have copied that occupancy instead of sharing a board. Occupying `root` would shadow AppFrame. Occupying `overlay-desktop.body` would exclusive-disable other desktops and paint a full-viewport page, not concurrent silhouettes.
 
 ## Decision
 
@@ -14,7 +14,7 @@ The reusable host is [`ui-overlay-shaped`](../../../../packages/client/ui-overla
 
 [`parseDshClient`](../../../../packages/client/modules/src/index.ts) records `overlay-shaped.body` beside card and desktop body slots. An unknown string `overlayBody` still joins the boot graph; a non-string throws. Occupant packages declare `overlay-shaped.body` so the rail lists the row as `shaped` (hide plus unplug). The host itself is unlistable, like the desktop board. Card hide/unplug still must not disable `ui-overlay-shaped`. Unload the board with `overlay:live remove`.
 
-A shaped page occupies `overlay-shaped.body`. It does not register a second `shell.overlay` chrome id. Occupant insert and generator HOW is [overlay new shaped](../process/2026-09-14-overlay-new-shaped.md). Host seats own drag, persist, intra-board raise, and hide-while-mounted ([shaped drag](2026-09-14-overlay-shaped-drag.md), [shaped hide](2026-09-14-overlay-shaped-hide.md)). This note partially supersedes [standalone television](2026-09-14-overlay-television-standalone-fiber.md): the host now exists; that CRT stays a standalone fiber until a later change retargets it onto `overlay-shaped.body`.
+A shaped page occupies `overlay-shaped.body`. It does not register a second `shell.overlay` chrome id. Occupant insert and generator HOW is [overlay new shaped](../process/2026-09-14-overlay-new-shaped.md). Host seats own drag, persist, intra-board raise, and hide-while-mounted ([shaped drag](2026-09-14-overlay-shaped-drag.md), [shaped hide](2026-09-14-overlay-shaped-hide.md)). This note partially supersedes [standalone television](2026-09-14-overlay-television-standalone-fiber.md): the host now exists; a standalone fiber stays off the board until a later change retargets it onto `overlay-shaped.body`.
 
 ## Alternatives considered
 
@@ -24,7 +24,7 @@ A shaped page occupies `overlay-shaped.body`. It does not register a second `she
 
 **Author occupant HOW in the same change.** Rejected for the host change — the host is the reusable board. Occupant insert/generator HOW lives in [overlay new shaped](../process/2026-09-14-overlay-new-shaped.md); hide-while-mounted lives in [shaped hide](2026-09-14-overlay-shaped-hide.md). Drag lives in [shaped drag](2026-09-14-overlay-shaped-drag.md).
 
-**Treat [`ui-television`](../../../../packages/client/ui-television/README.md) as the host.** Rejected — that package is a product fiber, not a list board.
+**Treat a product CRT as the host.** Rejected — a product fiber is not a list board.
 
 **Occupy `root` or `overlay-card.body`.** Rejected — `root` is AppFrame; cards are the other authored form.
 
@@ -32,7 +32,7 @@ A shaped page occupies `overlay-shaped.body`. It does not register a second `she
 
 ## Consequences
 
-Inserting only the host leaves the overlay visually unchanged. The Cursor rail does not list that host. Occupants that declare `overlay-shaped.body` can coexist on one board. New occupants follow [overlay new shaped](../process/2026-09-14-overlay-new-shaped.md). Television remains a standalone `shell.overlay` fiber until migrated.
+Inserting only the host leaves the overlay visually unchanged. The Cursor rail does not list that host. Occupants that declare `overlay-shaped.body` can coexist on one board. New occupants follow [overlay new shaped](../process/2026-09-14-overlay-new-shaped.md). A package that omits `overlayBody` remains a standalone `shell.overlay` fiber until migrated.
 
 ## Testing
 

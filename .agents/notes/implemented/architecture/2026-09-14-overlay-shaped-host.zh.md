@@ -6,7 +6,7 @@ Status: implemented
 
 ## Problem
 
-任意形状 overlay 形态（skill id `dsh-overlay-shaped-plugins`）没有可插入的宿主。贡献者要么用产品自己的铬框 id 占据 `shell.overlay`，要么把非卡片轮廓塞进 `overlay-card.body`，要么停在写着「停下」的预留 skill 后面。第一个产品 [`ui-television`](../../../../packages/client/ui-television/README.md) 是独立 fiber（[独立 fiber](2026-09-14-overlay-television-standalone-fiber.md)）。第二个形状会去拷那套占用，而不是共享一块画板。占用 `root` 会盖住 AppFrame。占用 `overlay-desktop.body` 会互斥关掉其它桌面，并画出整页，而不是同时存在的轮廓。
+任意形状 overlay 形态（skill id `dsh-overlay-shaped-plugins`）没有可插入的宿主。贡献者要么用产品自己的铬框 id 占据 `shell.overlay`，要么把非卡片轮廓塞进 `overlay-card.body`，要么停在写着「停下」的预留 skill 后面。第一个产品可以是独立 fiber（[独立 fiber](2026-09-14-overlay-television-standalone-fiber.md)）。第二个形状会去拷那套占用，而不是共享一块画板。占用 `root` 会盖住 AppFrame。占用 `overlay-desktop.body` 会互斥关掉其它桌面，并画出整页，而不是同时存在的轮廓。
 
 ## Decision
 
@@ -14,7 +14,7 @@ Status: implemented
 
 [`parseDshClient`](../../../../packages/client/modules/src/index.ts) 把 `overlay-shaped.body` 和卡片、桌面 body 槽一起记录。未知字符串 `overlayBody` 仍加入启动图；非字符串会抛错。占用者包声明 `overlay-shaped.body`，以便插件栏把该行列为 `shaped`（隐藏加拔出）。宿主自身不出现在列表里，和桌面基模一样。卡片侧的隐藏/拔出仍不得禁用 `ui-overlay-shaped`。卸载画板用 `overlay:live remove`。
 
-异形页面占据 `overlay-shaped.body`。它不再注册第二个 `shell.overlay` 铬框 id。占用者插入与生成 HOW 见 [overlay 异形占用者生成](../process/2026-09-14-overlay-new-shaped.md)。宿主座位拥有拖动、持久化、板内置顶和挂着不画（[异形拖动](2026-09-14-overlay-shaped-drag.md)，[异形隐藏](2026-09-14-overlay-shaped-hide.md)）。本笔记部分取代 [独立电视](2026-09-14-overlay-television-standalone-fiber.md)：宿主已经存在；那台 CRT 在以后改挂到 `overlay-shaped.body` 之前仍是独立 fiber。
+异形页面占据 `overlay-shaped.body`。它不再注册第二个 `shell.overlay` 铬框 id。占用者插入与生成 HOW 见 [overlay 异形占用者生成](../process/2026-09-14-overlay-new-shaped.md)。宿主座位拥有拖动、持久化、板内置顶和挂着不画（[异形拖动](2026-09-14-overlay-shaped-drag.md)，[异形隐藏](2026-09-14-overlay-shaped-hide.md)）。本笔记部分取代 [独立电视](2026-09-14-overlay-television-standalone-fiber.md)：宿主已经存在；省略 `overlayBody` 的包在改挂到 `overlay-shaped.body` 之前仍是独立 fiber。
 
 ## Alternatives considered
 
@@ -24,7 +24,7 @@ Status: implemented
 
 **同一变更里写成占用者 HOW。** 宿主变更否决 — 宿主是可复用画板。占用者插入/生成 HOW 在 [overlay 异形占用者生成](../process/2026-09-14-overlay-new-shaped.md)；挂着不画见 [异形隐藏](2026-09-14-overlay-shaped-hide.md)。拖动见 [异形拖动](2026-09-14-overlay-shaped-drag.md)。
 
-**把 [`ui-television`](../../../../packages/client/ui-television/README.md) 当宿主。** 否决 — 那是产品 fiber，不是 list 画板。
+**把产品 CRT 当宿主。** 否决 — 产品 fiber 不是 list 画板。
 
 **占用 `root` 或 `overlay-card.body`。** 否决 — `root` 是 AppFrame；卡片是另一种已撰写形态。
 
@@ -32,7 +32,7 @@ Status: implemented
 
 ## Consequences
 
-只插入宿主时 overlay 画面不变。Cursor 轨不列出该宿主。声明 `overlay-shaped.body` 的占用者可以共存于同一块画板。新占用者走 [overlay 异形占用者生成](../process/2026-09-14-overlay-new-shaped.md)。电视在迁移之前仍是独立的 `shell.overlay` fiber。
+只插入宿主时 overlay 画面不变。Cursor 轨不列出该宿主。声明 `overlay-shaped.body` 的占用者可以共存于同一块画板。新占用者走 [overlay 异形占用者生成](../process/2026-09-14-overlay-new-shaped.md)。省略 `overlayBody` 的包在迁移之前仍是独立的 `shell.overlay` fiber。
 
 ## Testing
 
