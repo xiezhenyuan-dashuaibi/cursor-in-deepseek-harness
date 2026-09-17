@@ -2,17 +2,15 @@
 
 English | [中文](README.zh.md)
 
-This is a **personal** project. It floats the Cursor CLI on DeepSeek Harness `dsh web` as a glass conversation card. It is not an official DeepSeek AI product and not an official Cursor / Anysphere product.
+DeepSeek Harness is powerful.
 
-## What you get
+But DeepSeek V4 Flash, The model still isn't really there.
 
-- A title-less Cursor chat card on `dsh web` (sessions, queue, slash menus, AskQuestion including Other and CJK IME)
-- Live overlay cards you can hide or unplug from the left rail
-- Overlay Cursor extras (`dsh_skill`, `dsh_system_prompt`) on the floating CLI
+If you pay for Cursor, you will probably like this. It puts Cursor inside DeepSeek Harness, keeps the parts of DSH that are actually good, and brings the Cursor terminal along with it. Frontend shell, hooked into `dsh web`.
 
-## Upstream
+Plugins are easy to insert while you work, and you manage them in one place. You don't have to finish it in one shot. It can keep growing.
 
-The tree includes [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (MIT) as the host. Official DSH stays at that repository.
+Personal project. Not DeepSeek, not Cursor. Models and quota come from your Cursor account.
 
 ## Run from source
 
@@ -26,10 +24,10 @@ pnpm run build
 pnpm dsh web
 ```
 
-Open `http://127.0.0.1:3080/`. The overlay skips the DeepSeek API-key onboarding dialog.
+Open `http://127.0.0.1:3080/` in a browser.
 
 ## License
 
-[MIT](LICENSE), same as upstream DeepSeek Harness.
+[MIT](LICENSE), same as upstream [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
 
 Third-party dependencies: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
